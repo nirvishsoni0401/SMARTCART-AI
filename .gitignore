@@ -1,0 +1,42 @@
+# Environments & Secrets
+.env
+.env.*
+!.env.example
+
+# Python & Virtual Environments
+venv/
+.venv/
+backend/venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.pytest_cache/
+
+# Databases & SQLite WAL files
+*.db
+*.sqlite
+*.sqlite3
+backend/smartcart.db
+backend/smartcart.db-shm
+backend/smartcart.db-wal
+
+# Node / Frontend
+**/node_modules/
+**/.next/
+**/.turbo/
+**/dist/
+**/build/
+.npm/
+
+# Generated experiment plots and caches (large binaries)
+# Note: we can keep scripts and plots or ignore plots if large, but gitignore allows committing code
+# Keep plots tracked or ignored as needed
+
+# IDE / OS
+.idea/
+.vscode/
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.log

@@ -1,0 +1,5 @@
+,Matched Events,Acceptance Rate (%),Cumulative Replay Reward,Mean Reward per Match,Mean IPS Reward
+LinUCB (alpha=0.5),159.0,5.3,400.0,2.516,2.667
+DiscountedLinUCB,140.0,4.67,262.0,1.871,1.747
+Popularity Baseline,124.0,4.13,298.0,2.403,1.987
+Random Policy,153.0,5.1,356.0,2.327,2.373

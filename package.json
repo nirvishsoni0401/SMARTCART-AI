@@ -1,0 +1,16 @@
+{
+  "name": "smartcart-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-category E-commerce Platform with Adaptive Contextual Bandit (LinUCB) Recommendations",
+  "scripts": {
+    "start": "node run.js",
+    "seed": "cd backend && .\\venv\\Scripts\\python.exe -m app.seed",
+    "test": "cd backend && .\\venv\\Scripts\\pytest.exe tests/ -v",
+    "experiments": "cd experiments && ..\\backend\\venv\\Scripts\\python.exe run_experiments.py",
+    "offline-eval": "cd experiments && ..\\backend\\venv\\Scripts\\python.exe offline_eval.py",
+    "backend": "cd backend && .\\venv\\Scripts\\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "frontend": "cd frontend && npm run dev"
+  }
+}
+

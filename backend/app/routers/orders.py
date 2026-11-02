@@ -1,0 +1,152 @@
+from datetime import datetime
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import Order, OrderItem, CartItem, Product, User, InteractionEvent, RecommendationLog
+from app.schemas import OrderCreate, OrderOut, OrderItemOut, ProductOut, ReturnItemRequest
+from app.auth import get_current_user
+from app.config import settings
+
+router = APIRouter(prefix="/orders", tags=["Orders"])
+
+@router.post("", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
+def checkout(
+    order_in: OrderCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Fetch user's cart items
+    cart_items = db.query(CartItem).filter(CartItem.user_id == current_user.id).all()
+    if not cart_items:
+        # Fallback to session items if user logged in during checkout
+        if order_in.session_id:
+            cart_items = db.query(CartItem).filter(CartItem.session_id == order_in.session_id).all()
+
+    if not cart_items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Your cart is empty")
+
+    total_amount = sum(item.product.price * item.quantity for item in cart_items)
+
+    order = Order(
+        user_id=current_user.id,
+        total_amount=round(total_amount, 2),
+        shipping_address=order_in.shipping_address,
+        payment_method=order_in.payment_method or "UPI / Mock Pay",
+        status="placed"
+    )
+    db.add(order)
+    db.flush()  # assign order.id
+
+    algo = current_user.assigned_algorithm or settings.GLOBAL_ALGORITHM
+    should_track = current_user.consent_tracking
+
+    for item in cart_items:
+        order_item = OrderItem(
+            order_id=order.id,
+            product_id=item.product_id,
+            quantity=item.quantity,
+            price=item.product.price,
+            status="placed"
+        )
+        db.add(order_item)
+
+        # Decrement stock
+        if item.product.stock >= item.quantity:
+            item.product.stock -= item.quantity
+
+        # Record purchase event (+10 reward)
+        if should_track:
+            # Look up recent recommendation log if exists
+            recent_log = db.query(RecommendationLog).filter(
+                RecommendationLog.user_id == current_user.id,
+                RecommendationLog.product_id == item.product_id
+            ).order_by(RecommendationLog.created_at.desc()).first()
+
+            event = InteractionEvent(
+                user_id=current_user.id,
+                session_id=order_in.session_id,
+                product_id=item.product_id,
+                event_type="purchase",
+                reward=settings.rewards.purchase,
+                algorithm=algo,
+                recommendation_log_id=recent_log.id if recent_log else None
+            )
+            db.add(event)
+
+    # Clear cart
+    db.query(CartItem).filter(
+        (CartItem.user_id == current_user.id) |
+        (CartItem.session_id == order_in.session_id)
+    ).delete(synchronize_session=False)
+
+    db.commit()
+    db.refresh(order)
+    return OrderOut.model_validate(order)
+
+@router.get("", response_model=List[OrderOut])
+def get_orders(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    orders = db.query(Order).filter(Order.user_id == current_user.id).order_by(Order.created_at.desc()).all()
+    return [OrderOut.model_validate(o) for o in orders]
+
+@router.get("/{order_id}", response_model=OrderOut)
+def get_order(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    order = db.query(Order).filter(Order.id == order_id, Order.user_id == current_user.id).first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return OrderOut.model_validate(order)
+
+@router.post("/{order_id}/items/{item_id}/return", response_model=OrderOut)
+def return_order_item(
+    order_id: int,
+    item_id: int,
+    return_req: ReturnItemRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    order = db.query(Order).filter(Order.id == order_id, Order.user_id == current_user.id).first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    order_item = db.query(OrderItem).filter(OrderItem.id == item_id, OrderItem.order_id == order_id).first()
+    if not order_item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order item not found")
+
+    if order_item.status == "returned":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item has already been returned")
+
+    order_item.status = "returned"
+    order_item.returned_at = datetime.utcnow()
+
+    # Restore stock
+    order_item.product.stock += order_item.quantity
+
+    # Emit delayed return event (-8 reward)
+    should_track = current_user.consent_tracking
+    if should_track:
+        recent_log = db.query(RecommendationLog).filter(
+            RecommendationLog.user_id == current_user.id,
+            RecommendationLog.product_id == order_item.product_id
+        ).order_by(RecommendationLog.created_at.desc()).first()
+
+        algo = current_user.assigned_algorithm or settings.GLOBAL_ALGORITHM
+        event = InteractionEvent(
+            user_id=current_user.id,
+            product_id=order_item.product_id,
+            event_type="return",
+            reward=settings.rewards.return_item,
+            algorithm=algo,
+            recommendation_log_id=recent_log.id if recent_log else None
+        )
+        db.add(event)
+
+    db.commit()
+    db.refresh(order)
+    return OrderOut.model_validate(order)

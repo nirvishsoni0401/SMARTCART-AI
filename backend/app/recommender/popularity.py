@@ -1,0 +1,60 @@
+from typing import List, Dict, Any, Optional
+import numpy as np
+from app.recommender.base import BaseRecommender, CandidateItem, ScoredCandidate
+
+class PopularityRecommender(BaseRecommender):
+    """
+    Non-personalized baseline policy.
+    Ranks items based on product popularity score and rating.
+    """
+
+    def __init__(self, feature_dim: int = 36):
+        super().__init__(name="popularity", feature_dim=feature_dim)
+        self.total_reward = 0.0
+
+    def select(
+        self,
+        candidates: List[CandidateItem],
+        top_k: int = 10,
+        context: Optional[Dict[str, Any]] = None
+    ) -> List[ScoredCandidate]:
+        if not candidates:
+            return []
+
+        scored: List[ScoredCandidate] = []
+        for cand in candidates:
+            p = cand.product_data
+            # Popularity score scaled + rating contribution
+            pop = getattr(p, "popularity_score", 50.0)
+            rating = getattr(p, "rating", 4.0)
+            score = float(pop * 0.7 + (rating / 5.0) * 30.0)
+
+            scored.append(
+                ScoredCandidate(
+                    candidate=cand,
+                    score=score,
+                    ucb_bonus=0.0,
+                    expected_reward=score,
+                    was_exploration=False
+                )
+            )
+
+        scored.sort(key=lambda x: x.score, reverse=True)
+        return scored[:top_k]
+
+    def update(self, feature_vector: np.ndarray, reward: float) -> None:
+        self.total_reward += float(reward)
+        self.n_updates += 1
+
+    def get_state(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "feature_dim": self.feature_dim,
+            "n_updates": self.n_updates,
+            "total_reward": self.total_reward
+        }
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        self.n_updates = int(state.get("n_updates", 0))
+        self.total_reward = float(state.get("total_reward", 0.0))
+

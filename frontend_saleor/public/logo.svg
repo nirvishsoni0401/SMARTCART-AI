@@ -1,0 +1,17 @@
+<svg width="150" height="34" viewBox="0 0 150 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- SmartCart AI Icon -->
+  <g id="cart-icon">
+    <rect x="2" y="4" width="26" height="26" rx="6" fill="#18181b"/>
+    <!-- Cart Lines -->
+    <path d="M8 10H11L13.5 21H22L24 13H12" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="14.5" cy="24" r="1.5" fill="#38bdf8"/>
+    <circle cx="21" cy="24" r="1.5" fill="#38bdf8"/>
+    <!-- AI Spark -->
+    <path d="M21 7L22 9.5L24.5 10.5L22 11.5L21 14L20 11.5L17.5 10.5L20 9.5L21 7Z" fill="#38bdf8"/>
+  </g>
+  <!-- Text: SmartCart AI -->
+  <text x="35" y="23" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="18" fill="#18181b" letter-spacing="-0.5">Smart<tspan fill="#2563eb">Cart</tspan></text>
+  <!-- AI Badge -->
+  <rect x="116" y="9" width="28" height="17" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+  <text x="120" y="21.5" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="10" fill="#2563eb">AI</text>
+</svg>
