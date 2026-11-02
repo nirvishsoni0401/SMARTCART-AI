@@ -35,7 +35,9 @@ class Settings(BaseModel):
     CANDIDATE_POOL_SIZE: int = 50
     DEFAULT_RECOMMENDATION_COUNT: int = 10
     MAX_PER_CATEGORY_TOP10: int = 3
+    MIN_CANDIDATES_PER_CATEGORY: int = 2
     IMPRESSION_TIMEOUT_MINUTES: int = 5
+    USD_TO_INR_RATE: float = float(os.getenv("USD_TO_INR_RATE", "85.0"))
     
     # Global algorithm override ("linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random", or "ab_test")
     GLOBAL_ALGORITHM: str = "linucb"

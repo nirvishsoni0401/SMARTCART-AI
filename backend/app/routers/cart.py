@@ -41,7 +41,8 @@ def get_cart(
                 product_id=item.product_id,
                 quantity=item.quantity,
                 price=item.product.price,
-                product=ProductOut.model_validate(item.product)
+                product=ProductOut.model_validate(item.product),
+                created_at=item.created_at
             )
         )
 
@@ -57,9 +58,9 @@ def add_to_cart(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    product = db.query(Product).filter(Product.id == item_in.product_id).first()
+    product = db.query(Product).filter(Product.id == item_in.product_id, Product.is_active == True).first()
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found or inactive")
 
     cart_filter = get_cart_filter(current_user, item_in.session_id)
     if cart_filter is None:
@@ -91,7 +92,8 @@ def add_to_cart(
             product_id=item_in.product_id,
             event_type="cart_add",
             reward=settings.rewards.cart_add,
-            algorithm=algo
+            algorithm=algo,
+            origin="live"
         )
         db.add(event)
 
@@ -144,7 +146,8 @@ def remove_from_cart(
             product_id=prod_id,
             event_type="cart_remove",
             reward=settings.rewards.cart_remove,
-            algorithm=algo
+            algorithm=algo,
+            origin="live"
         )
         db.add(event)
 

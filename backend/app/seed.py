@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import SessionLocal, init_db
 from app.models import Product, User, CartItem, WishlistItem, Order, OrderItem, InteractionEvent, RecommendationLog, ModelState
 from app.auth import hash_password
@@ -189,7 +189,7 @@ def seed_database():
                     image_url=image_url,
                     attributes=attributes,
                     stock=stock,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
                 products.append(product)
                 product_id += 1

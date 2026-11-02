@@ -55,6 +55,14 @@ class BaseRecommender(ABC):
         """Online parameter update based on observed reward signal."""
         pass
 
+    def correct_reward(self, feature_vector: np.ndarray, delta_reward: float) -> None:
+        """
+        Revision/correction for an already-observed sample (e.g. delayed return compensation).
+        Must update ONLY the reward vector b (b += delta_reward * x) and recompute theta,
+        leaving covariance matrix A and its inverse A_inv strictly unchanged.
+        """
+        pass
+
     @abstractmethod
     def get_state(self) -> Dict[str, Any]:
         """Serialize internal policy state to JSON-serializable dictionary."""

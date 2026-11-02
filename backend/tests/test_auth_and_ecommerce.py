@@ -58,7 +58,8 @@ def test_products_catalog():
     res = client.get("/products?page=1&page_size=10")
     assert res.status_code == 200
     data = res.json()
-    assert data["total"] >= 600
+    # Phase 8: active catalog now powered by DummyJSON + seeded Books (262 active SKUs)
+    assert data["total"] >= 200
     assert len(data["products"]) == 10
 
     # 2. Filter by category
@@ -102,8 +103,12 @@ def test_cart_and_checkout_flow():
     # Clear cart first
     client.delete("/cart", headers=headers)
 
+    # Fetch active product for checkout
+    active_prods = client.get("/products?page=1&page_size=2").json()["products"]
+    test_prod_id = active_prods[0]["id"]
+
     # Add item to cart
-    add_res = client.post("/cart", json={"product_id": 1, "quantity": 2}, headers=headers)
+    add_res = client.post("/cart", json={"product_id": test_prod_id, "quantity": 2}, headers=headers)
     assert add_res.status_code == 201
     cart_data = add_res.json()
     assert cart_data["total_items"] >= 2
@@ -144,13 +149,17 @@ def test_wishlist_flow():
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
+    # Fetch active product for wishlist
+    active_prods = client.get("/products?page=1&page_size=2").json()["products"]
+    w_prod_id = active_prods[0]["id"]
+
     # Add to wishlist
-    add_w = client.post("/wishlist", json={"product_id": 5}, headers=headers)
+    add_w = client.post("/wishlist", json={"product_id": w_prod_id}, headers=headers)
     assert add_w.status_code == 201
-    assert any(item["product_id"] == 5 for item in add_w.json()["items"])
+    assert any(item["product_id"] == w_prod_id for item in add_w.json()["items"])
 
     # Remove from wishlist
-    del_w = client.delete("/wishlist/5", headers=headers)
+    del_w = client.delete(f"/wishlist/{w_prod_id}", headers=headers)
     assert del_w.status_code == 200
-    assert not any(item["product_id"] == 5 for item in del_w.json()["items"])
+    assert not any(item["product_id"] == w_prod_id for item in del_w.json()["items"])
 

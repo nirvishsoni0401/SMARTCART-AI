@@ -1,0 +1,98 @@
+{
+  "beauty": {
+    "department": "Beauty",
+    "reason": "Cosmetics, personal care, and grooming products belong to Beauty & Personal Care."
+  },
+  "fragrances": {
+    "department": "Beauty",
+    "reason": "Perfumes, colognes, and scents belong to Beauty & Personal Care."
+  },
+  "skin-care": {
+    "department": "Beauty",
+    "reason": "Skincare serums, moisturizers, and treatments belong to Beauty & Personal Care."
+  },
+  "furniture": {
+    "department": "Home & Kitchen",
+    "reason": "Chairs, tables, beds, and household fixtures belong to Home & Kitchen."
+  },
+  "home-decoration": {
+    "department": "Home & Kitchen",
+    "reason": "Interior decor, wall art, lamps, and clocks belong to Home & Kitchen."
+  },
+  "kitchen-accessories": {
+    "department": "Home & Kitchen",
+    "reason": "Cookware, kitchen tools, and dining utensils belong to Home & Kitchen."
+  },
+  "laptops": {
+    "department": "Electronics",
+    "reason": "Portable computers and notebooks belong to Electronics."
+  },
+  "mobile-accessories": {
+    "department": "Electronics",
+    "reason": "Phone cases, chargers, screen protectors, and cables belong to Electronics."
+  },
+  "smartphones": {
+    "department": "Electronics",
+    "reason": "Mobile phones and cellular devices belong to Electronics."
+  },
+  "tablets": {
+    "department": "Electronics",
+    "reason": "Touchscreen tablets and e-readers belong to Electronics."
+  },
+  "mens-shirts": {
+    "department": "Fashion",
+    "reason": "Men's tops, shirts, and casual wear belong to Fashion & Apparel."
+  },
+  "mens-shoes": {
+    "department": "Fashion",
+    "reason": "Men's sneakers, formal shoes, and boots belong to Fashion & Apparel."
+  },
+  "mens-watches": {
+    "department": "Fashion",
+    "reason": "Men's wristwatches and timepieces belong to Fashion & Apparel."
+  },
+  "sunglasses": {
+    "department": "Fashion",
+    "reason": "Eyewear and fashion shades belong to Fashion & Apparel."
+  },
+  "tops": {
+    "department": "Fashion",
+    "reason": "Women's blouses, t-shirts, and everyday tops belong to Fashion & Apparel."
+  },
+  "womens-bags": {
+    "department": "Fashion",
+    "reason": "Handbags, clutches, totes, and purses belong to Fashion & Apparel."
+  },
+  "womens-dresses": {
+    "department": "Fashion",
+    "reason": "Women's formal, casual, and party dresses belong to Fashion & Apparel."
+  },
+  "womens-jewellery": {
+    "department": "Fashion",
+    "reason": "Earrings, necklaces, rings, and bracelets belong to Fashion & Apparel."
+  },
+  "womens-shoes": {
+    "department": "Fashion",
+    "reason": "Women's heels, flats, and casual sneakers belong to Fashion & Apparel."
+  },
+  "womens-watches": {
+    "department": "Fashion",
+    "reason": "Women's wristwatches and designer timepieces belong to Fashion & Apparel."
+  },
+  "sports-accessories": {
+    "department": "Sports",
+    "reason": "Fitness equipment, workout gear, and athletic accessories belong to Sports & Fitness."
+  },
+  "groceries": {
+    "department": "excluded",
+    "reason": "Perishable food, snacks, and fresh produce are outside SmartCart core consumer durable catalog."
+  },
+  "motorcycle": {
+    "department": "excluded",
+    "reason": "Automotive two-wheeler motor vehicles require specialized dealership registration."
+  },
+  "vehicle": {
+    "department": "excluded",
+    "reason": "Full-size passenger automotive vehicles are outside consumer retail e-commerce scope."
+  }
+}

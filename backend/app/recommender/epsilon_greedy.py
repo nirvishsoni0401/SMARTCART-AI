@@ -80,6 +80,14 @@ class EpsilonGreedyRecommender(BaseRecommender):
         self.b += reward * phi
         self.n_updates += 1
 
+    def correct_reward(self, feature_vector: np.ndarray, delta_reward: float) -> None:
+        phi = np.asarray(feature_vector, dtype=np.float64)
+        self.b += float(delta_reward) * phi
+        self.n_updates += 1
+
+    def get_theta(self) -> np.ndarray:
+        return self.A_inv @ self.b
+
     def get_state(self) -> Dict[str, Any]:
         return {
             "name": self.name,

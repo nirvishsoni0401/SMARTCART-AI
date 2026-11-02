@@ -71,6 +71,7 @@ class UserContext:
         self.avg_price = avg_price
         self.total_interactions = total_interactions
         self.cart_categories = cart_categories or {}
+        self.is_cold_start = (total_interactions == 0)
 
 def build_user_context(
     db: Session,

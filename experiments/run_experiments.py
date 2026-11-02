@@ -46,17 +46,53 @@ def instantiate_policies(feature_dim: int = 36, alpha: float = 0.5, gamma: float
         "Random": RandomRecommender(feature_dim=feature_dim),
     }
 
+def load_catalog_products() -> List[Any]:
+    """Loads active products from database with a fixed-seed synthetic fallback."""
+    init_db()
+    db = SessionLocal()
+    try:
+        products = db.query(Product).filter(Product.is_active == True).all()
+        if not products:
+            products = db.query(Product).all()
+    finally:
+        db.close()
+
+    if not products:
+        print("[CatalogLoader] Warning: No products found in DB. Generating fixed-seed synthetic fallback (120 items).")
+        import random
+        from types import SimpleNamespace
+        rng = random.Random(42)
+        cats = ["Electronics", "Fashion", "Home & Kitchen", "Beauty", "Sports", "Books"]
+        products = []
+        for i in range(1, 121):
+            cat = rng.choice(cats)
+            p = SimpleNamespace(
+                id=i,
+                name=f"Synthetic {cat} SKU #{i}",
+                category=cat,
+                brand=f"Brand_{rng.randint(1, 8)}",
+                price=round(rng.uniform(350.0, 18000.0), 2),
+                mrp=round(rng.uniform(500.0, 22000.0), 2),
+                discount_pct=round(rng.uniform(0.0, 45.0), 1),
+                rating=round(rng.uniform(3.6, 4.9), 1),
+                rating_count=rng.randint(15, 600),
+                popularity_score=round(rng.uniform(25.0, 95.0), 1),
+                stock=50,
+                attributes={"is_synthetic": True},
+                source="synthetic",
+                is_active=True
+            )
+            products.append(p)
+    return products
+
 def run_experiment_suite(num_rounds: int = 1500, num_seeds: int = 5, drift_at_round: int = 750):
     print("=" * 70)
     print("         SMARTCART AI — EXPERIMENT & EVALUATION SUITE            ")
     print(f" Rounds per run: {num_rounds} | Random Seeds: {num_seeds} | Drift round: {drift_at_round}")
     print("=" * 70)
 
-    # 1. Load products from SQLite DB
-    init_db()
-    db = SessionLocal()
-    products = db.query(Product).all()
-    db.close()
+    # 1. Load active products from SQLite DB with synthetic fallback
+    products = load_catalog_products()
 
     if not products:
         raise ValueError("No products found in DB! Please run backend/app/seed.py first.")

@@ -1,15 +1,17 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-# --- Auth Schemas ---
+# --- User & Auth Schemas ---
 
-class UserCreate(BaseModel):
-    name: str = Field(..., min_length=2)
+class UserRegister(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=6)
     role: Optional[str] = "user"
     consent_tracking: Optional[bool] = True
+
+UserCreate = UserRegister
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -19,7 +21,7 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
-    email: EmailStr
+    email: str
     role: str
     assigned_algorithm: str
     consent_tracking: bool
@@ -34,6 +36,17 @@ class ConsentUpdate(BaseModel):
     consent_tracking: bool
 
 # --- Product Schemas ---
+
+class ProductReviewOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    product_id: int
+    reviewer_name: str
+    rating: float
+    comment: str
+    date: Optional[datetime] = None
+    source: str = "dummyjson"
+    created_at: datetime
 
 class ProductOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -51,7 +64,13 @@ class ProductOut(BaseModel):
     image_url: str
     attributes: Dict[str, Any] = {}
     stock: int
+    source: str = "seed"
+    source_id: Optional[str] = None
+    is_active: bool = True
+    raw_price_usd: Optional[float] = None
+    imported_at: Optional[datetime] = None
     created_at: datetime
+    reviews: List[ProductReviewOut] = []
 
 class PaginatedProducts(BaseModel):
     total: int
@@ -68,27 +87,29 @@ class CartItemAdd(BaseModel):
     session_id: Optional[str] = None
 
 class CartItemUpdate(BaseModel):
-    quantity: int = Field(..., ge=0)
+    quantity: int = Field(..., ge=1)
 
 class CartItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     product_id: int
     quantity: int
-    price: float
+    price: Optional[float] = None
     product: ProductOut
+    created_at: Optional[datetime] = None
 
 class CartOut(BaseModel):
     items: List[CartItemOut]
     total_items: int
     subtotal: float
-    currency: str = "INR"
 
 # --- Wishlist Schemas ---
 
-class WishlistAdd(BaseModel):
+class WishlistItemAdd(BaseModel):
     product_id: int
     session_id: Optional[str] = None
+
+WishlistAdd = WishlistItemAdd
 
 class WishlistItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -157,11 +178,13 @@ class EventCreate(BaseModel):
     event_type: str  # click, dislike, wishlist, cart_add, cart_remove, purchase, return, skip
     recommendation_log_id: Optional[int] = None
     session_id: Optional[str] = None
+    origin: Optional[str] = "live"
 
 class ImpressionBatchCreate(BaseModel):
     product_ids: List[int]
     recommendation_log_ids: Optional[List[int]] = None
     session_id: Optional[str] = None
+    origin: Optional[str] = "live"
 
 class EventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -171,6 +194,7 @@ class EventOut(BaseModel):
     reward: float
     algorithm: str
     recommendation_log_id: Optional[int]
+    origin: str = "live"
     created_at: datetime
 
 # --- Admin Schemas ---
@@ -191,3 +215,5 @@ class RewardConfigUpdate(BaseModel):
 class SimulateRequest(BaseModel):
     num_rounds: int = Field(50, ge=1, le=500)
     algorithms: Optional[List[str]] = None
+    train_live: bool = False
+    origin: Optional[str] = "simulated"

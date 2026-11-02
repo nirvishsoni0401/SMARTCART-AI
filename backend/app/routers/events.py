@@ -98,10 +98,16 @@ def record_event(
 
     # Online model update
     model = model_store.get_model(algo_name)
-    model.update(feature_vector, reward)
+    if event_in.event_type == "return":
+        # Delayed return correction: update ONLY reward vector b
+        delta_reward = settings.rewards.return_item - settings.rewards.purchase
+        model.correct_reward(feature_vector, delta_reward)
+    else:
+        model.update(feature_vector, reward)
     model_store.save_model_to_db(algo_name, db=db)
 
     # Persist interaction event
+    origin = getattr(event_in, "origin", None) or "live"
     event = InteractionEvent(
         user_id=current_user.id if current_user else None,
         session_id=event_in.session_id,
@@ -109,6 +115,7 @@ def record_event(
         event_type=event_in.event_type,
         reward=reward,
         algorithm=algo_name,
+        origin=origin,
         recommendation_log_id=event_in.recommendation_log_id
     )
     db.add(event)
@@ -128,6 +135,7 @@ def record_impressions_batch(
         return {"status": "ignored", "reason": "tracking_consent_disabled"}
 
     algo_name = current_user.assigned_algorithm if current_user else settings.GLOBAL_ALGORITHM
+    origin = getattr(batch, "origin", None) or "live"
 
     for i, prod_id in enumerate(batch.product_ids):
         log_id = batch.recommendation_log_ids[i] if batch.recommendation_log_ids and i < len(batch.recommendation_log_ids) else None
@@ -138,6 +146,7 @@ def record_impressions_batch(
             event_type="impression",
             reward=0.0,
             algorithm=algo_name,
+            origin=origin,
             recommendation_log_id=log_id
         )
         db.add(event)

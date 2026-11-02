@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -7,6 +8,8 @@ from app.models import Order, OrderItem, CartItem, Product, User, InteractionEve
 from app.schemas import OrderCreate, OrderOut, OrderItemOut, ProductOut, ReturnItemRequest
 from app.auth import get_current_user
 from app.config import settings
+from app.services.model_store import model_store
+from app.services.feature_engineering import build_user_context, extract_feature_vector
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -25,6 +28,11 @@ def checkout(
 
     if not cart_items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Your cart is empty")
+
+    # Ensure all cart products are active
+    for item in cart_items:
+        if not item.product.is_active:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Product '{item.product.name}' is no longer active.")
 
     total_amount = sum(item.product.price * item.quantity for item in cart_items)
 
@@ -70,6 +78,7 @@ def checkout(
                 event_type="purchase",
                 reward=settings.rewards.purchase,
                 algorithm=algo,
+                origin="live",
                 recommendation_log_id=recent_log.id if recent_log else None
             )
             db.add(event)
@@ -123,12 +132,12 @@ def return_order_item(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item has already been returned")
 
     order_item.status = "returned"
-    order_item.returned_at = datetime.utcnow()
+    order_item.returned_at = datetime.now(timezone.utc)
 
     # Restore stock
     order_item.product.stock += order_item.quantity
 
-    # Emit delayed return event (-8 reward)
+    # Emit delayed return event and update bandit via correct_reward (A & A_inv unchanged)
     should_track = current_user.consent_tracking
     if should_track:
         recent_log = db.query(RecommendationLog).filter(
@@ -137,12 +146,30 @@ def return_order_item(
         ).order_by(RecommendationLog.created_at.desc()).first()
 
         algo = current_user.assigned_algorithm or settings.GLOBAL_ALGORITHM
+        
+        # Delta reward: original purchase awarded +10.0; return penalizes -8.0 -> delta is -18.0
+        delta_reward = settings.rewards.return_item - settings.rewards.purchase
+
+        feature_vector = None
+        if recent_log and recent_log.feature_vector:
+            algo = recent_log.algorithm
+            feature_vector = np.array(recent_log.feature_vector, dtype=np.float64)
+        else:
+            ctx = build_user_context(db=db, user_id=current_user.id)
+            feature_vector = extract_feature_vector(ctx, order_item.product)
+
+        # Apply correction to model reward vector b WITHOUT modifying A or A_inv
+        model = model_store.get_model(algo)
+        model.correct_reward(feature_vector, delta_reward)
+        model_store.save_model_to_db(algo, db=db)
+
         event = InteractionEvent(
             user_id=current_user.id,
             product_id=order_item.product_id,
             event_type="return",
             reward=settings.rewards.return_item,
             algorithm=algo,
+            origin="live",
             recommendation_log_id=recent_log.id if recent_log else None
         )
         db.add(event)

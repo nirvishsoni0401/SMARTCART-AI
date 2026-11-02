@@ -83,6 +83,16 @@ class DiscountedLinUCBRecommender(BaseRecommender):
         except np.linalg.LinAlgError:
             self.A_inv = np.linalg.pinv(self.A)
 
+    def correct_reward(self, feature_vector: np.ndarray, delta_reward: float) -> None:
+        """
+        Revision for an already-counted sample.
+        Updates ONLY the reward vector b (b += delta_reward * phi).
+        A and A_inv are unchanged.
+        """
+        phi = np.asarray(feature_vector, dtype=np.float64)
+        self.b += float(delta_reward) * phi
+        self.n_updates += 1
+
     def get_state(self) -> Dict[str, Any]:
         return {
             "name": self.name,

@@ -44,9 +44,9 @@ def add_to_wishlist(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    product = db.query(Product).filter(Product.id == item_in.product_id).first()
+    product = db.query(Product).filter(Product.id == item_in.product_id, Product.is_active == True).first()
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found or inactive")
 
     w_filter = get_wishlist_filter(current_user, item_in.session_id)
     if w_filter is None:
@@ -75,7 +75,8 @@ def add_to_wishlist(
                 product_id=item_in.product_id,
                 event_type="wishlist",
                 reward=settings.rewards.wishlist,
-                algorithm=algo
+                algorithm=algo,
+                origin="live"
             )
             db.add(event)
 

@@ -100,6 +100,20 @@ class LinUCBRecommender(BaseRecommender):
             except np.linalg.LinAlgError:
                 pass
 
+    def correct_reward(self, feature_vector: np.ndarray, delta_reward: float) -> None:
+        """
+        Revision for an already-counted sample (e.g. delayed return compensation).
+        Updates ONLY the reward vector b (b += delta_reward * phi).
+        A and A_inv are strictly NOT modified.
+        """
+        phi = np.asarray(feature_vector, dtype=np.float64)
+        delta_reward = float(delta_reward)
+        self.b += delta_reward * phi
+        self.n_updates += 1
+
+    def get_theta(self) -> np.ndarray:
+        return self.A_inv @ self.b
+
     def get_state(self) -> Dict[str, Any]:
         return {
             "name": self.name,

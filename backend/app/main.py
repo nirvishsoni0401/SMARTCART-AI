@@ -1,8 +1,10 @@
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
+from app.services.latency_tracker import latency_tracker
 from app.routers import auth, products, cart, wishlist, orders, recommendations, events, admin
 
 @asynccontextmanager
@@ -17,6 +19,16 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Timing middleware for end-to-end endpoint latency tracking
+@app.middleware("http")
+async def timing_middleware(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000.0
+    latency_tracker.record_e2e(request.url.path, duration_ms)
+    response.headers["X-Process-Time-Ms"] = f"{duration_ms:.2f}"
+    return response
 
 # CORS middleware for frontend communication (:5173, :3000, etc.)
 app.add_middleware(

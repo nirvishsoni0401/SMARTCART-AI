@@ -1,7 +1,7 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, desc, asc
+from sqlalchemy import or_, and_, desc, asc, func
 from app.database import get_db
 from app.models import Product
 from app.schemas import ProductOut, PaginatedProducts
@@ -23,7 +23,8 @@ def list_products(
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Product)
+    # Enforce active products only
+    query = db.query(Product).filter(Product.is_active == True)
 
     if q:
         clean_q = f"%{q.strip()}%"
@@ -66,11 +67,11 @@ def list_products(
         query = query.order_by(desc(Product.rating), desc(Product.rating_count))
     elif sort_by == "newest":
         query = query.order_by(desc(Product.created_at))
-    else:  # default / popularity
+    else:  # "popularity" (default)
         query = query.order_by(desc(Product.popularity_score), desc(Product.rating))
 
     total = query.count()
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+    total_pages = max(1, (total + page_size - 1) // page_size)
     offset = (page - 1) * page_size
     products = query.offset(offset).limit(page_size).all()
 
@@ -84,16 +85,15 @@ def list_products(
 
 @router.get("/categories")
 def get_categories(db: Session = Depends(get_db)):
-    from sqlalchemy import func
     results = db.query(
         Product.category,
         func.count(Product.id).label("count")
-    ).group_by(Product.category).order_by(desc("count")).all()
+    ).filter(Product.is_active == True).group_by(Product.category).order_by(desc("count")).all()
     return [{"name": r[0], "count": r[1]} for r in results]
 
 @router.get("/brands")
 def get_brands(category: Optional[str] = None, db: Session = Depends(get_db)):
-    query = db.query(Product.brand)
+    query = db.query(Product.brand).filter(Product.is_active == True)
     if category and category.lower() != "all":
         query = query.filter(Product.category.ilike(category))
     brands = [r[0] for r in query.distinct().order_by(Product.brand).all() if r[0]]
@@ -101,20 +101,21 @@ def get_brands(category: Optional[str] = None, db: Session = Depends(get_db)):
 
 @router.get("/{product_id}", response_model=ProductOut)
 def get_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = db.query(Product).filter(Product.id == product_id, Product.is_active == True).first()
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found or inactive")
     return ProductOut.model_validate(product)
 
 @router.get("/{product_id}/similar", response_model=List[ProductOut])
 def get_similar_products(product_id: int, limit: int = 6, db: Session = Depends(get_db)):
-    target = db.query(Product).filter(Product.id == product_id).first()
+    target = db.query(Product).filter(Product.id == product_id, Product.is_active == True).first()
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found or inactive")
 
     similar = db.query(Product).filter(
         Product.category == target.category,
         Product.id != target.id,
+        Product.is_active == True,
         Product.stock > 0
     ).order_by(
         desc(Product.rating),
