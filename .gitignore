@@ -20,6 +20,13 @@ __pycache__/
 backend/smartcart.db
 backend/smartcart.db-shm
 backend/smartcart.db-wal
+backend/historical.db
+backend/historical.db-shm
+backend/historical.db-wal
+
+# Large datasets & raw data
+RetailRocket_Dataset/
+data/raw/retailrocket/
 
 # Node / Frontend
 **/node_modules/

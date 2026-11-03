@@ -149,16 +149,23 @@ def test_origin_filtering():
     m_live = client.get("/admin/metrics?origin=live").json()
     m_sim = client.get("/admin/metrics?origin=simulated").json()
     m_legacy = client.get("/admin/metrics?origin=legacy").json()
+    m_test = client.get("/admin/metrics?origin=test").json()
     m_all = client.get("/admin/metrics?origin=all").json()
 
     assert m_live["origin_filter"] == "live"
     assert m_sim["origin_filter"] == "simulated"
     assert m_legacy["origin_filter"] == "legacy"
+    assert m_test["origin_filter"] == "test"
     assert m_all["origin_filter"] == "all"
 
-    # All events count must equal live + sim + legacy
+    # All events count must equal sum of disjoint origin partitions
     ev_all = m_all["overall"]["total_events"]
-    ev_sum = m_live["overall"]["total_events"] + m_sim["overall"]["total_events"] + m_legacy["overall"]["total_events"]
+    ev_sum = (
+        m_live["overall"]["total_events"]
+        + m_sim["overall"]["total_events"]
+        + m_legacy["overall"]["total_events"]
+        + m_test["overall"]["total_events"]
+    )
     assert ev_all == ev_sum
 
 
@@ -274,3 +281,4 @@ def test_concurrent_event_posts():
     assert model.n_updates == initial_updates + num_threads
     assert not np.isnan(model.A).any()
     assert not np.isnan(model.A_inv).any()
+

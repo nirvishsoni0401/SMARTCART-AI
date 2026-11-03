@@ -29,12 +29,40 @@ Index Range | Feature Description                       | Bounds / Type
 Total dimensions: 36
 """
 
+import hashlib
+import math
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
-import math
 import numpy as np
 from sqlalchemy.orm import Session
 from app.models import Product, InteractionEvent, CartItem, OrderItem
+
+FEATURE_DIMENSION: int = 36
+
+CANONICAL_FEATURE_SPEC: str = (
+    "dim=36:"
+    "0-5=user_category_affinity(6):"
+    "6=user_brand_affinity:"
+    "7=user_avg_price_log:"
+    "8=session_budget_log:"
+    "9=price_fit_score:"
+    "10=in_budget_flag:"
+    "11=category_search_match:"
+    "12-17=product_category_onehot(6):"
+    "18=product_price_log:"
+    "19=product_rating_norm:"
+    "20=product_discount_pct:"
+    "21=product_popularity_score:"
+    "22-29=brand_hash_bucket(8):"
+    "30=new_product_flag:"
+    "31=user_activity_level:"
+    "32=cart_intent_match:"
+    "33=high_rating_flag:"
+    "34=high_discount_flag:"
+    "35=intercept_bias"
+)
+
+FEATURE_SPEC_HASH: str = hashlib.sha256(CANONICAL_FEATURE_SPEC.encode("utf-8")).hexdigest()[:12]
 
 CATEGORIES = [
     "Electronics",

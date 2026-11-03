@@ -84,27 +84,39 @@ def record_event(
         rec_log = db.query(RecommendationLog).filter(RecommendationLog.id == event_in.recommendation_log_id).first()
         if rec_log:
             algo_name = rec_log.algorithm
-            feature_vector = np.array(rec_log.feature_vector, dtype=np.float64)
+            stored_v = rec_log.feature_vector_snapshot or rec_log.feature_vector
+            if stored_v:
+                feature_vector = np.array(stored_v, dtype=np.float64)
             rec_log.resolved = True
 
-    # Fallback to computing feature vector on-the-fly
+    # Fallback to computing feature vector on-the-fly for regular events
+    # For 'return' events, NEVER recompute: skip bandit update if no snapshot exists
     if feature_vector is None:
-        ctx = build_user_context(
-            db=db,
-            user_id=current_user.id if current_user else None,
-            session_id=event_in.session_id
-        )
-        feature_vector = extract_feature_vector(ctx, product)
+        if event_in.event_type == "return":
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Skipping return correction for product {product.id}: "
+                f"no recommendation log with stored feature vector found."
+            )
+        else:
+            ctx = build_user_context(
+                db=db,
+                user_id=current_user.id if current_user else None,
+                session_id=event_in.session_id
+            )
+            feature_vector = extract_feature_vector(ctx, product)
 
     # Online model update
-    model = model_store.get_model(algo_name)
-    if event_in.event_type == "return":
-        # Delayed return correction: update ONLY reward vector b
-        delta_reward = settings.rewards.return_item - settings.rewards.purchase
-        model.correct_reward(feature_vector, delta_reward)
-    else:
-        model.update(feature_vector, reward)
-    model_store.save_model_to_db(algo_name, db=db)
+    if feature_vector is not None:
+        model = model_store.get_model(algo_name)
+        if model is not None:
+            if event_in.event_type == "return":
+                # Delayed return correction: update ONLY reward vector b
+                delta_reward = settings.rewards.return_item - settings.rewards.purchase
+                model.correct_reward(feature_vector, delta_reward)
+            else:
+                model.update(feature_vector, reward)
+            model_store.save_model_to_db(algo_name, db=db)
 
     # Persist interaction event
     origin = getattr(event_in, "origin", None) or "live"

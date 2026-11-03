@@ -56,22 +56,22 @@ Three categories (`groceries`, `motorcycle`, and `vehicle`) representing 37 item
 | :---: | :--- | :--- | :---: | :---: | :--- |
 | 1 | `beauty` | **Beauty** | Ingested | 5 | Personal cosmetic items, makeup, and skin preparations. |
 | 2 | `fragrances` | **Beauty** | Ingested | 5 | Perfumes, colognes, and luxury fragrances. |
-| 3 | `skin-care` | **Beauty** | Ingested | 5 | Facial cleansers, anti-aging serums, and moisturizers. |
+| 3 | `skin-care` | **Beauty** | Ingested | 3 | Facial cleansers, anti-aging serums, and moisturizers. |
 | 4 | `furniture` | **Home & Kitchen** | Ingested | 5 | Living room chairs, dining sets, beds, and home furnishings. |
 | 5 | `home-decoration` | **Home & Kitchen** | Ingested | 5 | Wall decor, clocks, decorative plants, and interior lighting. |
 | 6 | `kitchen-accessories` | **Home & Kitchen** | Ingested | 30 | Cookware, cutting boards, spatulas, and food preparation utensils. |
 | 7 | `laptops` | **Electronics** | Ingested | 5 | Laptops, ultrabooks, notebooks, and mobile workstations. |
 | 8 | `mobile-accessories` | **Electronics** | Ingested | 14 | Charging cables, phone mounts, protective cases, and adapters. |
-| 9 | `smartphones` | **Electronics** | Ingested | 14 | Android and iOS smartphones and cellular devices. |
-| 10 | `tablets` | **Electronics** | Ingested | 5 | Portable touchscreen computing tablets and e-readers. |
+| 9 | `smartphones` | **Electronics** | Ingested | 16 | Android and iOS smartphones and cellular devices. |
+| 10 | `tablets` | **Electronics** | Ingested | 3 | Portable touchscreen computing tablets and e-readers. |
 | 11 | `mens-shirts` | **Fashion** | Ingested | 5 | Men's casual, button-down, and formal shirts. |
 | 12 | `mens-shoes` | **Fashion** | Ingested | 5 | Men's athletic sneakers, dress shoes, and casual footwear. |
-| 13 | `mens-watches` | **Fashion** | Ingested | 5 | Men's luxury analog, chronograph, and digital timepieces. |
+| 13 | `mens-watches` | **Fashion** | Ingested | 6 | Men's luxury analog, chronograph, and digital timepieces. |
 | 14 | `sunglasses` | **Fashion** | Ingested | 5 | Polarized eyewear, designer frames, and UV shades. |
 | 15 | `tops` | **Fashion** | Ingested | 5 | Women's casual blouses, tees, and summer tops. |
 | 16 | `womens-bags` | **Fashion** | Ingested | 5 | Handbags, designer clutches, crossbody bags, and totes. |
 | 17 | `womens-dresses` | **Fashion** | Ingested | 5 | Evening gowns, cocktail dresses, and casual wear. |
-| 18 | `womens-jewellery` | **Fashion** | Ingested | 5 | Necklaces, gold/silver earrings, bracelets, and rings. |
+| 18 | `womens-jewellery` | **Fashion** | Ingested | 3 | Necklaces, gold/silver earrings, bracelets, and rings. |
 | 19 | `womens-shoes` | **Fashion** | Ingested | 5 | High heels, platform shoes, and women's flats. |
 | 20 | `womens-watches` | **Fashion** | Ingested | 5 | Women's luxury wristwatches and fashion timepieces. |
 | 21 | `sports-accessories` | **Sports** | Ingested | 17 | Fitness trackers, resistance bands, sports balls, and gym gear. |
@@ -101,7 +101,7 @@ $$\text{origin} \in \{\text{'live'}, \text{'simulated'}, \text{'legacy'}\}$$
    - `/admin/metrics` and `/admin/logs` support `?origin=live|simulated|legacy|all` query filtering, defaulting to `live` so administrative views reflect genuine interactions.
 
 ### 3.2. Return Correction Math Verification
-When a customer purchases a product, the bandit agent observes a reward $r_{\text{purchase}} = +20.0$. If the order is subsequently returned or cancelled, the feedback must be penalized without invalidating historical feature correlations.
+When a customer purchases a product, the bandit agent observes a reward $r_{\text{purchase}} = +10.0$. If an order item is subsequently returned, the feedback must be penalized without invalidating historical feature correlations.
 
 #### Covariance Matrix Invariance ($A$)
 In linear contextual bandits (LinUCB), the covariance matrix $A$ represents the uncentered second moment of observed contexts:
@@ -111,7 +111,7 @@ The matrix $A$ depends solely on the context vector $x_\tau$ of the recommended 
 #### Reward Vector Correction ($b$)
 The reward vector $b$ tracks accumulated reward projections onto the feature space:
 $$b_t = \sum_{\tau=1}^t r_\tau x_\tau$$
-When a return occurs, the earlier purchase reward ($+20.0$) is offset by a return penalty ($\Delta r = -18.0$), yielding a net reward of $+2.0$ (reflecting positive browsing intent but failed retention).
+When a return occurs, the earlier purchase reward ($+10.0$) is offset by a return penalty ($\Delta r = -18.0$, computed as $r_{\text{return}} - r_{\text{purchase}} = -8.0 - 10.0 = -18.0$), yielding a net cumulative reward of $-8.0$ (matching the configured `return_item` penalty).
 
 The correction is applied directly:
 $$b \leftarrow b + \Delta r \cdot x \quad (\Delta r = -18.0)$$
@@ -119,7 +119,7 @@ The ridge regression parameter vector updates dynamically without re-inverting $
 $$\hat{\theta} = A^{-1} b$$
 
 #### Idempotency & Duplicate Guards
-The `/orders/{order_id}/return` endpoint was enhanced with duplicate-return validation. Attempting to return an already returned or cancelled order immediately aborts with `HTTP 400 Bad Request`, preventing unbounded reward degradation.
+The `POST /orders/{order_id}/items/{item_id}/return` endpoint was enhanced with duplicate-return validation. Attempting to return an already returned item immediately aborts with `HTTP 400 Bad Request`, preventing unbounded reward degradation and enabling fine-grained partial returns.
 
 ### 3.3. Thread-Safe Concurrency Protection
 To prevent race conditions where simultaneous user clicks or purchases overwrite bandit weights, the `ModelStore` was fortified with an internal re-entrant lock:
@@ -275,3 +275,4 @@ In accordance with rigorous engineering practice, the following known limitation
 Phase 8 successfully transitioned SmartCart AI from synthetic seed data to a clean, verified retail catalog backed by real-world reviews, robust origin segregation, mathematically sound return compensation, thread-safe model execution, and comprehensive latency monitoring.
 
 All deliverables have been completed, verified via automated test suites (25/25 passing), and committed to source control. In accordance with project instructions, work is paused pending user review. Phase 9 will not begin until explicit approval is granted.
+

@@ -48,8 +48,8 @@ def test_admin_metrics_and_simulation():
     # Revert purchase reward to 10.0
     client.put("/admin/reward-config", json={"purchase": 10.0}, headers=admin_headers)
 
-    # 4. Get recommendation logs
-    logs_res = client.get("/admin/logs?limit=10")
+    # 4. Get recommendation logs (check origin=all to include simulated / legacy logs)
+    logs_res = client.get("/admin/logs?limit=10&origin=all")
     assert logs_res.status_code == 200
     assert len(logs_res.json()) > 0
 

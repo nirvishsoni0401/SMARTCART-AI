@@ -42,3 +42,4 @@ class LatencyTracker:
 
 # Global singleton
 latency_tracker = LatencyTracker()
+

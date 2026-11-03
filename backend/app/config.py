@@ -42,6 +42,10 @@ class Settings(BaseModel):
     # Global algorithm override ("linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random", or "ab_test")
     GLOBAL_ALGORITHM: str = "linucb"
     
+    # Feature specification metadata (binding for bandit models)
+    FEATURE_DIMENSION: int = 36
+    FEATURE_SPEC_HASH: str = "75f60ed70b2a"
+    
     # Reward mapping
     rewards: RewardConfig = RewardConfig()
 

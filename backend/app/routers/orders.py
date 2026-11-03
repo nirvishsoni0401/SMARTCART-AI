@@ -145,23 +145,35 @@ def return_order_item(
             RecommendationLog.product_id == order_item.product_id
         ).order_by(RecommendationLog.created_at.desc()).first()
 
-        algo = current_user.assigned_algorithm or settings.GLOBAL_ALGORITHM
+        algo = recent_log.algorithm if recent_log else (current_user.assigned_algorithm or settings.GLOBAL_ALGORITHM)
         
-        # Delta reward: original purchase awarded +10.0; return penalizes -8.0 -> delta is -18.0
+        # Delta reward: return reward minus purchase reward (-8.0 - 10.0 = -18.0)
+        # Ensuring net reward equals return_item reward (-8.0)
         delta_reward = settings.rewards.return_item - settings.rewards.purchase
 
-        feature_vector = None
-        if recent_log and recent_log.feature_vector:
-            algo = recent_log.algorithm
-            feature_vector = np.array(recent_log.feature_vector, dtype=np.float64)
-        else:
-            ctx = build_user_context(db=db, user_id=current_user.id)
-            feature_vector = extract_feature_vector(ctx, order_item.product)
+        # 0.2: Use ONLY the stored feature-vector snapshot from original log; NEVER recompute on-the-fly.
+        stored_vector = None
+        if recent_log and (recent_log.feature_vector_snapshot or recent_log.feature_vector):
+            stored_vector = recent_log.feature_vector_snapshot or recent_log.feature_vector
 
-        # Apply correction to model reward vector b WITHOUT modifying A or A_inv
-        model = model_store.get_model(algo)
-        model.correct_reward(feature_vector, delta_reward)
-        model_store.save_model_to_db(algo, db=db)
+        if stored_vector is not None:
+            feature_vector = np.array(stored_vector, dtype=np.float64)
+            # Apply correction to model reward vector b WITHOUT modifying A or A_inv
+            model = model_store.get_model(algo)
+            if model is not None:
+                model.correct_reward(feature_vector, delta_reward)
+                model_store.save_model_to_db(algo, db=db)
+            else:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"Skipping return correction: algorithm model '{algo}' not found."
+                )
+        else:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Skipping return correction for order {order_id} item {item_id}: "
+                f"no recommendation log with stored feature vector found."
+            )
 
         event = InteractionEvent(
             user_id=current_user.id,

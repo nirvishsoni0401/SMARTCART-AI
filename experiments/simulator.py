@@ -1,7 +1,18 @@
 import math
 import random
+import sys
+from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 import numpy as np
+
+# Single source of truth: import reward config from backend app.config
+try:
+    from app.config import settings
+except ImportError:
+    backend_path = Path(__file__).resolve().parent.parent / "backend"
+    if str(backend_path) not in sys.path:
+        sys.path.insert(0, str(backend_path))
+    from app.config import settings
 
 class CustomerPersona:
     """Represents a simulated shopper with hidden ground-truth preferences."""
@@ -200,6 +211,7 @@ class ShoppingSimulator:
 
         roll = self.rng.random()
 
+        rewards = settings.rewards
         if roll < p_click:
             # Clicked! Now check cart addition
             p_cart = min(0.85, max(0.1, 0.45 * (u + 0.5)))
@@ -210,17 +222,17 @@ class ShoppingSimulator:
                     # Purchased! Check potential return
                     p_return = 0.08 * (1.0 - getattr(product, "rating", 4.0) / 5.0)
                     if self.rng.random() < p_return:
-                        return "return", -8.0, u
-                    return "purchase", 10.0, u
-                return "cart_add", 5.0, u
-            return "click", 2.0, u
+                        return "return", rewards.return_item, u
+                    return "purchase", rewards.purchase, u
+                return "cart_add", rewards.cart_add, u
+            return "click", rewards.click, u
         else:
             # Unclicked / skipped. Check if disliked
             p_dislike = 1.0 / (1.0 + math.exp(3.2 * u))  # high when utility is negative
             p_dislike = min(0.35, max(0.01, p_dislike * 0.4))
             if self.rng.random() < p_dislike:
-                return "dislike", -5.0, u
-            return "skip", 0.0, u
+                return "dislike", rewards.dislike, u
+            return "skip", rewards.skip, u
 
     def compute_oracle_best_reward(
         self,
@@ -233,6 +245,7 @@ class ShoppingSimulator:
         """
         best_reward = -float("inf")
         best_prod = None
+        rewards = settings.rewards
 
         for prod in candidate_products:
             u = persona.compute_hidden_utility(prod)
@@ -241,7 +254,7 @@ class ShoppingSimulator:
             p_cart = p_click * min(0.85, max(0.1, 0.45 * (u + 0.5)))
             p_buy = p_cart * min(0.85, max(0.15, 0.55 * (u + 0.5)))
             
-            exp_r = p_buy * 10.0 + (p_cart - p_buy) * 5.0 + (p_click - p_cart) * 2.0
+            exp_r = p_buy * rewards.purchase + (p_cart - p_buy) * rewards.cart_add + (p_click - p_cart) * rewards.click
             if exp_r > best_reward:
                 best_reward = exp_r
                 best_prod = prod
