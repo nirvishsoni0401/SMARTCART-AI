@@ -222,4 +222,9 @@ class SimulateRequest(BaseModel):
 class WarmStartApplyRequest(BaseModel):
     snapshot_key: str
     target_algorithm: Optional[str] = None
+    confirm: bool = False
+    force: bool = False
+    apply_to_sandbox: bool = False
+    max_live_updates_threshold: int = 100
+
 

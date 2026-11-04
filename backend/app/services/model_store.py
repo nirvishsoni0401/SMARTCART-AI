@@ -193,8 +193,21 @@ class ModelStore:
                 db = SessionLocal()
                 owns = True
             try:
-                prefix = f"snapshot:{snapshot_name}:"
+                clean_name = snapshot_name
+                if clean_name.startswith("snapshot:"):
+                    clean_name = clean_name[len("snapshot:"):]
+                
+                prefix = f"snapshot:{clean_name}:"
                 rows = db.query(ModelState).filter(ModelState.algorithm.like(f"{prefix}%")).all()
+                if not rows:
+                    # Try single model exact match or partial match
+                    single = db.query(ModelState).filter(
+                        (ModelState.algorithm == snapshot_name) |
+                        (ModelState.algorithm == f"snapshot:{clean_name}")
+                    ).first()
+                    if single:
+                        rows = [single]
+                        prefix = single.algorithm.rsplit(":", 1)[0] + ":"
                 if not rows:
                     return False
                 for r in rows:
@@ -208,6 +221,7 @@ class ModelStore:
             finally:
                 if owns:
                     db.close()
+
 
 
 # Global singleton

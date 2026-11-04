@@ -29,6 +29,7 @@ backend/historical.db-wal
 # Large datasets & raw data
 RetailRocket_Dataset/
 data/raw/retailrocket/
+*.npz
 
 # Node / Frontend
 **/node_modules/

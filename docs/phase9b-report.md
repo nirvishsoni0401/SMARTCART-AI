@@ -327,3 +327,4 @@ Two new endpoints were implemented in `backend/app/routers/admin.py`:
   - `experiments/plots/retailrocket/bootstrap_ci.png`
   - `experiments/plots/retailrocket/n_cap_ablation.png`
   - `experiments/plots/retailrocket/pseudo_negatives_ablation.png`
+

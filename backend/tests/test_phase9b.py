@@ -298,9 +298,9 @@ def test_admin_apply_warm_start_unauthorized(client):
 def test_admin_apply_warm_start_authorized(client, admin_token, db_session):
     """POST /admin/models/warm-start/apply should succeed with admin credentials."""
     headers = {"Authorization": f"Bearer {admin_token}"}
-    payload = {"snapshot_key": "warm_start:v1:linucb", "target_algorithm": "linucb"}
+    payload = {"snapshot_key": "warm_start:v1:linucb", "target_algorithm": "linucb", "confirm": True, "force": True}
     resp = client.post("/admin/models/warm-start/apply", json=payload, headers=headers)
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     res_json = resp.json()
     assert res_json["status"] == "success"
     assert res_json["target_algorithm"] == "linucb"

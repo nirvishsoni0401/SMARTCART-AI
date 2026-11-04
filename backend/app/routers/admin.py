@@ -536,9 +536,20 @@ def apply_warm_start(
 ):
     """
     Copies a specified warm-start snapshot into the active operational slot
-    for that algorithm. Requires admin authentication.
-    Creates an audit log record in model_history with origin='warm_start'.
+    or sandbox for that algorithm. Requires admin authentication.
+    - Requires confirm=true
+    - Validates FEATURE_SPEC_HASH and dimension
+    - Archives current live state before applying as snapshot:pre_warmstart:<timestamp>:<algo>
+    - Refuses to overwrite live model if live updates > threshold unless force=true
+    - Supports apply_to_sandbox=true
+    - Creates an audit log record in model_history with origin='warm_start'
     """
+    if not req.confirm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Action requires explicit confirmation. Please set confirm=true."
+        )
+
     snapshot = db.query(ModelState).filter(ModelState.algorithm == req.snapshot_key).first()
     if not snapshot:
         raise HTTPException(
@@ -565,38 +576,90 @@ def apply_warm_start(
             detail=f"Target algorithm '{target_algo}' is invalid. Must be one of {valid_algos}"
         )
 
-    # Load state into active in-memory model
-    model = model_store.get_model(target_algo)
-    if not model:
+    # 1. Verify FEATURE_SPEC_HASH and dimension
+    snap_hash = metadata.get("feature_spec_hash")
+    if snap_hash and snap_hash != settings.FEATURE_SPEC_HASH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Feature spec hash mismatch: snapshot has '{snap_hash}', current system requires '{settings.FEATURE_SPEC_HASH}'"
+        )
+
+    snap_dim = metadata.get("feature_dim", model_state.get("feature_dim"))
+    if snap_dim and snap_dim != settings.FEATURE_DIMENSION:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Feature dimension mismatch: snapshot has {snap_dim}, current system requires {settings.FEATURE_DIMENSION}"
+        )
+
+    now = datetime.now(timezone.utc)
+    target_key = f"sim:{target_algo}" if req.apply_to_sandbox else target_algo
+
+    # 2. Check live model update threshold and archive before applying
+    current_row = db.query(ModelState).filter(ModelState.algorithm == target_key).first()
+    current_updates = current_row.n_updates if current_row else 0
+
+    if not req.apply_to_sandbox and current_updates > req.max_live_updates_threshold and not req.force:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Live model '{target_algo}' has {current_updates} updates (threshold={req.max_live_updates_threshold}). Refusing to overwrite without force=true."
+        )
+
+    # Archive current state before overwriting
+    ts_str = now.strftime("%Y%m%d_%H%M%S_%f")
+    archive_key = f"snapshot:pre_warmstart:{ts_str}:{target_algo}"
+    current_model = model_store.get_model(target_algo, sandbox=req.apply_to_sandbox)
+    archive_state_blob = current_row.state_blob if current_row else json.dumps(current_model.get_state() if current_model else {})
+    
+    archive_row = db.query(ModelState).filter(ModelState.algorithm == archive_key).first()
+    if not archive_row:
+        archive_row = ModelState(
+            algorithm=archive_key,
+            state_blob=archive_state_blob,
+            n_updates=current_updates,
+            updated_at=now
+        )
+        db.add(archive_row)
+    else:
+        archive_row.state_blob = archive_state_blob
+        archive_row.n_updates = current_updates
+        archive_row.updated_at = now
+
+    # 3. Apply state to model store
+    target_model = model_store.get_model(target_algo, sandbox=req.apply_to_sandbox)
+    if not target_model:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Model store has no registered policy '{target_algo}'"
         )
-    model.load_state(model_state)
+    target_model.load_state(model_state)
 
-    # Persist into active model slot in database
-    active_row = db.query(ModelState).filter(ModelState.algorithm == target_algo).first()
-    now = datetime.now(timezone.utc)
-    if not active_row:
-        active_row = ModelState(
-            algorithm=target_algo,
+    # 4. Persist into model_states table
+    if not current_row:
+        current_row = ModelState(
+            algorithm=target_key,
             state_blob=json.dumps(model_state),
-            n_updates=model.n_updates,
+            n_updates=target_model.n_updates,
             updated_at=now
         )
-        db.add(active_row)
+        db.add(current_row)
     else:
-        active_row.state_blob = json.dumps(model_state)
-        active_row.n_updates = model.n_updates
-        active_row.updated_at = now
+        current_row.state_blob = json.dumps(model_state)
+        current_row.n_updates = target_model.n_updates
+        current_row.updated_at = now
 
-    # Write audit log to model_history
+    # 5. Write audit log to model_history
     audit_entry = ModelHistory(
         algorithm=target_algo,
         action="apply_warm_start",
         snapshot_key=req.snapshot_key,
         origin="warm_start",
-        metadata_json=metadata,
+        metadata_json={
+            **metadata,
+            "apply_to_sandbox": req.apply_to_sandbox,
+            "archived_snapshot_key": archive_key,
+            "previous_updates": current_updates,
+            "new_updates": target_model.n_updates
+        },
         applied_by=current_admin.email,
         created_at=now
     )
@@ -605,11 +668,14 @@ def apply_warm_start(
 
     return {
         "status": "success",
-        "message": f"Successfully applied warm-start snapshot '{req.snapshot_key}' to active '{target_algo}'",
+        "message": f"Successfully applied warm-start snapshot '{req.snapshot_key}' to {'sandbox' if req.apply_to_sandbox else 'active'} '{target_algo}'",
         "target_algorithm": target_algo,
         "snapshot_key": req.snapshot_key,
-        "n_updates": model.n_updates,
+        "n_updates": target_model.n_updates,
+        "apply_to_sandbox": req.apply_to_sandbox,
+        "archived_snapshot_key": archive_key,
         "applied_by": current_admin.email,
         "applied_at": now.isoformat()
     }
+
 
