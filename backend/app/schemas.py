@@ -60,6 +60,7 @@ class ProductOut(BaseModel):
     rating: float
     rating_count: int
     popularity_score: float
+    popularity_prior: Optional[float] = 0.0
     description: Optional[str] = None
     image_url: str
     attributes: Dict[str, Any] = {}
@@ -217,3 +218,8 @@ class SimulateRequest(BaseModel):
     algorithms: Optional[List[str]] = None
     train_live: bool = False
     origin: Optional[str] = "simulated"
+
+class WarmStartApplyRequest(BaseModel):
+    snapshot_key: str
+    target_algorithm: Optional[str] = None
+

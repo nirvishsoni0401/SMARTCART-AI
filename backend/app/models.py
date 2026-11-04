@@ -40,6 +40,7 @@ class Product(Base):
     rating = Column(Float, default=4.0, nullable=False, index=True)
     rating_count = Column(Integer, default=0, nullable=False)
     popularity_score = Column(Float, default=50.0, nullable=False, index=True)
+    popularity_prior = Column(Float, default=0.0, nullable=True)
     description = Column(Text, nullable=True)
     image_url = Column(String(500), nullable=False)
     attributes = Column(JSON, default=dict, nullable=False)
@@ -177,3 +178,17 @@ class ModelState(Base):
     state_blob = Column(Text, nullable=False)  # Serialized model parameters / JSON
     n_updates = Column(Integer, default=0, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class ModelHistory(Base):
+    __tablename__ = "model_history"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    algorithm = Column(String(50), nullable=False, index=True)
+    action = Column(String(50), default="apply_warm_start", nullable=False)
+    snapshot_key = Column(String(100), nullable=False)
+    origin = Column(String(20), default="warm_start", nullable=False)
+    metadata_json = Column(JSON, nullable=True)
+    applied_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+

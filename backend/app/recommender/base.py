@@ -77,3 +77,66 @@ class BaseRecommender(ABC):
         """Return the current mean parameter vector theta (default zeros if non-linear)."""
         return np.zeros(self.feature_dim, dtype=float)
 
+    def warm_start_from_stats(
+        self,
+        stats: Any,
+        n_cap: Optional[int] = None,
+        lambda_reg: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Base warm-start implementation for linear contextual bandit policies.
+        Scales sufficient statistics A_hist and b_hist by s = min(1.0, n_cap / n_hist).
+        A_init = lambda * I + s * A_hist
+        b_init = s * b_hist
+        """
+        A_hist = np.asarray(stats["A_hist"], dtype=np.float64)
+        b_hist = np.asarray(stats["b_hist"], dtype=np.float64)
+        n_hist = int(stats.get("n_hist", stats.get("n_examples", 1)))
+
+        if A_hist.shape != (self.feature_dim, self.feature_dim):
+            raise ValueError(f"A_hist shape {A_hist.shape} does not match feature_dim {self.feature_dim}")
+
+        if lambda_reg is not None and hasattr(self, "lambda_reg"):
+            self.lambda_reg = float(lambda_reg)
+        lam = getattr(self, "lambda_reg", 1.0)
+
+        if n_cap is not None:
+            if n_cap <= 0:
+                s = 0.0
+            else:
+                s = min(1.0, float(n_cap) / float(max(1, n_hist)))
+        else:
+            s = 1.0
+
+        A_init = lam * np.eye(self.feature_dim, dtype=np.float64) + s * A_hist
+        b_init = s * b_hist
+
+        # Enforce symmetry
+        A_init = (A_init + A_init.T) / 2.0
+
+        # Validate SPD via Cholesky
+        try:
+            _ = np.linalg.cholesky(A_init)
+        except np.linalg.LinAlgError:
+            A_init += 1e-6 * np.eye(self.feature_dim)
+            _ = np.linalg.cholesky(A_init)
+
+        cond = float(np.linalg.cond(A_init))
+        if hasattr(self, "A"):
+            self.A = A_init
+        if hasattr(self, "A_inv"):
+            self.A_inv = np.linalg.inv(A_init)
+        if hasattr(self, "b"):
+            self.b = b_init
+        self.n_updates = int(s * n_hist)
+
+        return {
+            "scale_s": float(s),
+            "n_cap": n_cap,
+            "n_hist": n_hist,
+            "lambda_reg": lam,
+            "condition_number": cond,
+            "n_updates": self.n_updates
+        }
+
+

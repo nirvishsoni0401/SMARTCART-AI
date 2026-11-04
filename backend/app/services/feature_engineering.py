@@ -75,6 +75,16 @@ CATEGORIES = [
 CATEGORY_INDEX = {cat: i for i, cat in enumerate(CATEGORIES)}
 MAX_PRICE_SCALE = math.log(1.0 + 200000.0)
 
+
+def _get_attr(obj: Any, attr: str, default: Any = None) -> Any:
+    """Helper to retrieve attribute from either object or dictionary."""
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(attr, default)
+    return getattr(obj, attr, default)
+
+
 class UserContext:
     def __init__(
         self,
@@ -101,52 +111,93 @@ class UserContext:
         self.cart_categories = cart_categories or {}
         self.is_cold_start = (total_interactions == 0)
 
-def build_user_context(
-    db: Session,
+
+def build_context_from_history(
+    history: List[Any],
+    reference_time: Optional[datetime] = None,
     user_id: Optional[int] = None,
     session_id: Optional[str] = None,
     session_category: Optional[str] = None,
     session_query: Optional[str] = None,
-    session_budget: Optional[float] = None
+    session_budget: Optional[float] = None,
+    cart_categories: Optional[Dict[str, int]] = None
 ) -> UserContext:
-    """Extract and aggregate user interaction history into a UserContext."""
+    """
+    Extract and aggregate user interaction history into a UserContext.
+    Shared identically across live serving and offline training data / evaluation.
+    
+    `history` is an iterable of items, where each item can be:
+      - an InteractionEvent model instance
+      - a dictionary with keys ('product', 'event_type', 'created_at' or 'ts', 'reward')
+      - a tuple (product, event_type, created_at, reward)
+    """
     category_affinities = {cat: 0.0 for cat in CATEGORIES}
     brand_affinities: Dict[str, float] = {}
     purchased_prices: List[float] = []
     total_interactions = 0
-    cart_categories: Dict[str, int] = {}
+    cart_cats: Dict[str, int] = dict(cart_categories) if cart_categories else {}
 
-    # Query events for user or session
-    events_query = db.query(InteractionEvent)
-    if user_id:
-        events_query = events_query.filter(InteractionEvent.user_id == user_id)
-    elif session_id:
-        events_query = events_query.filter(InteractionEvent.session_id == session_id)
-    else:
-        events_query = None
+    ref_dt = reference_time
+    if ref_dt is None:
+        ref_dt = datetime.now(timezone.utc)
+    elif ref_dt.tzinfo is None:
+        ref_dt = ref_dt.replace(tzinfo=timezone.utc)
 
-    if events_query:
-        events = events_query.order_by(InteractionEvent.created_at.desc()).limit(100).all()
-        now = datetime.now(timezone.utc)
+    for item in history:
+        # Extract fields
+        prod = None
+        ev_type = "view"
+        ev_dt_val = None
+        reward_val = 0.0
 
-        for ev in events:
-            total_interactions += 1
-            # Exponential decay: half-life ~ 3 days (decay_rate ~ 0.23 per day)
-            age_days = (now - ev.created_at.replace(tzinfo=timezone.utc)).total_seconds() / 86400.0
-            decay = math.exp(-0.23 * max(0.0, age_days))
-            weight = ev.reward * decay
+        if hasattr(item, "product") and hasattr(item, "event_type"):
+            prod = item.product
+            ev_type = item.event_type
+            ev_dt_val = item.created_at
+            reward_val = getattr(item, "reward", 0.0)
+        elif isinstance(item, dict):
+            prod = item.get("product")
+            ev_type = item.get("event_type", "view")
+            ev_dt_val = item.get("created_at") if item.get("created_at") is not None else item.get("ts")
+            reward_val = item.get("reward", 0.0)
+        elif isinstance(item, (tuple, list)):
+            prod = item[0]
+            ev_type = item[1] if len(item) > 1 else "view"
+            ev_dt_val = item[2] if len(item) > 2 else None
+            reward_val = item[3] if len(item) > 3 else 0.0
 
-            if ev.product:
-                cat = ev.product.category
-                if cat in category_affinities:
-                    category_affinities[cat] += weight
+        total_interactions += 1
 
-                brand = ev.product.brand
-                if brand:
-                    brand_affinities[brand] = brand_affinities.get(brand, 0.0) + weight
+        # Convert timestamp to datetime if necessary
+        if isinstance(ev_dt_val, (int, float)):
+            # Check if ms or seconds
+            if ev_dt_val > 1e11:
+                ev_dt = datetime.fromtimestamp(ev_dt_val / 1000.0, tz=timezone.utc)
+            else:
+                ev_dt = datetime.fromtimestamp(ev_dt_val, tz=timezone.utc)
+        elif isinstance(ev_dt_val, datetime):
+            ev_dt = ev_dt_val if ev_dt_val.tzinfo is not None else ev_dt_val.replace(tzinfo=timezone.utc)
+        else:
+            ev_dt = ref_dt
 
-                if ev.event_type in ("purchase", "cart_add"):
-                    purchased_prices.append(ev.product.price)
+        # Exponential decay: half-life ~ 3 days (decay_rate ~ 0.23 per day)
+        age_days = (ref_dt - ev_dt).total_seconds() / 86400.0
+        decay = math.exp(-0.23 * max(0.0, age_days))
+        weight = float(reward_val) * decay
+
+        if prod is not None:
+            cat = _get_attr(prod, "category")
+            if cat in category_affinities:
+                category_affinities[cat] += weight
+
+            brand = _get_attr(prod, "brand")
+            if brand:
+                brand_affinities[brand] = brand_affinities.get(brand, 0.0) + weight
+
+            price = _get_attr(prod, "price")
+            if ev_type in ("purchase", "cart_add", "transaction"):
+                if price is not None:
+                    purchased_prices.append(float(price))
 
     # Normalize category affinities into [0, 1]
     max_cat = max(category_affinities.values()) if category_affinities else 0.0
@@ -160,18 +211,6 @@ def build_user_context(
         for b in brand_affinities:
             brand_affinities[b] = max(0.0, min(1.0, brand_affinities[b] / max_brand))
 
-    # Cart categories
-    cart_items = []
-    if user_id:
-        cart_items = db.query(CartItem).filter(CartItem.user_id == user_id).all()
-    elif session_id:
-        cart_items = db.query(CartItem).filter(CartItem.session_id == session_id).all()
-
-    for item in cart_items:
-        if item.product:
-            c = item.product.category
-            cart_categories[c] = cart_categories.get(c, 0) + item.quantity
-
     avg_price = float(np.mean(purchased_prices)) if purchased_prices else None
 
     return UserContext(
@@ -184,19 +223,73 @@ def build_user_context(
         brand_affinities=brand_affinities,
         avg_price=avg_price,
         total_interactions=total_interactions,
+        cart_categories=cart_cats
+    )
+
+
+def build_user_context(
+    db: Session,
+    user_id: Optional[int] = None,
+    session_id: Optional[str] = None,
+    session_category: Optional[str] = None,
+    session_query: Optional[str] = None,
+    session_budget: Optional[float] = None
+) -> UserContext:
+    """Extract and aggregate user interaction history into a UserContext via build_context_from_history."""
+    events_query = db.query(InteractionEvent)
+    if user_id:
+        events_query = events_query.filter(InteractionEvent.user_id == user_id)
+    elif session_id:
+        events_query = events_query.filter(InteractionEvent.session_id == session_id)
+    else:
+        events_query = None
+
+    events = []
+    if events_query:
+        events = events_query.order_by(InteractionEvent.created_at.desc()).limit(100).all()
+
+    cart_categories: Dict[str, int] = {}
+    cart_items = []
+    if user_id:
+        cart_items = db.query(CartItem).filter(CartItem.user_id == user_id).all()
+    elif session_id:
+        cart_items = db.query(CartItem).filter(CartItem.session_id == session_id).all()
+
+    for item in cart_items:
+        if item.product:
+            c = item.product.category
+            cart_categories[c] = cart_categories.get(c, 0) + item.quantity
+
+    return build_context_from_history(
+        history=events,
+        reference_time=datetime.now(timezone.utc),
+        user_id=user_id,
+        session_id=session_id,
+        session_category=session_category,
+        session_query=session_query,
+        session_budget=session_budget,
         cart_categories=cart_categories
     )
 
-def extract_feature_vector(context: UserContext, product: Product) -> np.ndarray:
+
+def extract_feature_vector(context: UserContext, product: Any) -> np.ndarray:
     """Generate the 36-dimensional joint feature vector phi(u, p)."""
-    phi = np.zeros(36, dtype=np.float64)
+    phi = np.zeros(FEATURE_DIMENSION, dtype=np.float64)
+
+    p_cat = _get_attr(product, "category", "")
+    p_brand = _get_attr(product, "brand", "") or ""
+    p_price = float(_get_attr(product, "price", 0.0) or 0.0)
+    p_rating = float(_get_attr(product, "rating", 4.0) or 4.0)
+    p_discount = float(_get_attr(product, "discount_pct", 0.0) or 0.0)
+    p_pop = float(_get_attr(product, "popularity_score", 50.0) or 50.0)
+    p_id = _get_attr(product, "id", 0) or 0
 
     # 0 - 5: User Category Affinity
     for i, cat in enumerate(CATEGORIES):
         phi[i] = context.category_affinities.get(cat, 0.0)
 
     # 6: Brand Affinity
-    phi[6] = context.brand_affinities.get(product.brand, 0.0)
+    phi[6] = context.brand_affinities.get(p_brand, 0.0)
 
     # 7: User Average Historical Price Level
     ref_price = context.avg_price if context.avg_price is not None else 1800.0
@@ -207,45 +300,45 @@ def extract_feature_vector(context: UserContext, product: Product) -> np.ndarray
     phi[8] = math.log(1.0 + budget) / MAX_PRICE_SCALE
 
     # 9: Price Fit Score
-    p_log = math.log(1.0 + product.price)
+    p_log = math.log(1.0 + p_price)
     target_log = math.log(1.0 + budget)
     price_diff = abs(p_log - target_log)
     phi[9] = max(0.0, 1.0 - (price_diff / 2.0))
 
     # 10: In-Budget Flag
-    phi[10] = 1.0 if product.price <= budget else 0.0
+    phi[10] = 1.0 if p_price <= budget else 0.0
 
     # 11: Category Search Match
-    if context.session_category and context.session_category.lower() == product.category.lower():
+    if context.session_category and context.session_category.lower() == str(p_cat).lower():
         phi[11] = 1.0
-    elif context.session_query and product.category.lower() in context.session_query.lower():
+    elif context.session_query and str(p_cat).lower() in context.session_query.lower():
         phi[11] = 1.0
     else:
         phi[11] = 0.0
 
     # 12 - 17: Product Category One-Hot
-    cat_idx = CATEGORY_INDEX.get(product.category)
+    cat_idx = CATEGORY_INDEX.get(p_cat)
     if cat_idx is not None:
         phi[12 + cat_idx] = 1.0
 
     # 18: Product Price (log-normalized)
-    phi[18] = math.log(1.0 + product.price) / MAX_PRICE_SCALE
+    phi[18] = math.log(1.0 + p_price) / MAX_PRICE_SCALE
 
     # 19: Product Rating
-    phi[19] = max(0.0, min(1.0, (product.rating - 1.0) / 4.0))
+    phi[19] = max(0.0, min(1.0, (p_rating - 1.0) / 4.0))
 
     # 20: Product Discount Percentage
-    phi[20] = max(0.0, min(1.0, product.discount_pct / 100.0))
+    phi[20] = max(0.0, min(1.0, p_discount / 100.0))
 
     # 21: Product Popularity Score
-    phi[21] = max(0.0, min(1.0, product.popularity_score / 100.0))
+    phi[21] = max(0.0, min(1.0, p_pop / 100.0))
 
     # 22 - 29: Brand Hash Buckets (8 bins)
-    bucket = abs(hash(product.brand or "")) % 8
+    bucket = abs(hash(p_brand)) % 8
     phi[22 + bucket] = 1.0
 
-    # 30: New Product Flag (simulate items created in catalog)
-    phi[30] = 1.0 if getattr(product, "id", 0) > 550 else 0.0
+    # 30: New Product Flag
+    phi[30] = 1.0 if (p_id and p_id > 550) else 0.0
 
     # 31: User Activity Level
     phi[31] = min(1.0, math.log(1.0 + context.total_interactions) / math.log(50.0))
@@ -253,19 +346,18 @@ def extract_feature_vector(context: UserContext, product: Product) -> np.ndarray
     # 32: Cart Intent Match
     total_cart = sum(context.cart_categories.values())
     if total_cart > 0:
-        cat_cart_count = context.cart_categories.get(product.category, 0)
+        cat_cart_count = context.cart_categories.get(p_cat, 0)
         phi[32] = cat_cart_count / total_cart
     else:
         phi[32] = 0.0
 
     # 33: High-Rating Flag (>= 4.5)
-    phi[33] = 1.0 if product.rating >= 4.5 else 0.0
+    phi[33] = 1.0 if p_rating >= 4.5 else 0.0
 
     # 34: High-Discount Flag (>= 30%)
-    phi[34] = 1.0 if product.discount_pct >= 30.0 else 0.0
+    phi[34] = 1.0 if p_discount >= 30.0 else 0.0
 
     # 35: Intercept / Bias term
     phi[35] = 1.0
 
     return phi
-

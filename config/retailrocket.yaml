@@ -32,3 +32,4 @@ retailrocket:
     mapping_version: "v1.0"
     svd_components: 16
     cooccurrence_window_sessions: true
+

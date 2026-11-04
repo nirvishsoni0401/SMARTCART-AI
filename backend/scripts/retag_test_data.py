@@ -16,3 +16,4 @@ print("After retagging events:", c.execute("SELECT origin, COUNT(*) FROM interac
 print("After retagging logs:", c.execute("SELECT origin, COUNT(*) FROM recommendation_logs GROUP BY origin").fetchall())
 
 conn.close()
+

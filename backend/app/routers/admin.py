@@ -1,5 +1,6 @@
 import time
 import uuid
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 import numpy as np
@@ -8,10 +9,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct, desc
 from app.database import get_db
 from app.models import (
-    User, Product, InteractionEvent, RecommendationLog, ModelState
+    User, Product, InteractionEvent, RecommendationLog, ModelState, ModelHistory
 )
 from app.schemas import (
-    AlgorithmUpdateRequest, RewardConfigUpdate, SimulateRequest
+    AlgorithmUpdateRequest, RewardConfigUpdate, SimulateRequest, WarmStartApplyRequest
 )
 from app.auth import get_current_admin, get_current_user_optional
 from app.config import settings
@@ -490,3 +491,125 @@ def get_recommendation_logs(
         }
         for log in logs
     ]
+
+
+@router.get("/models/warm-start/snapshots")
+def get_warm_start_snapshots(
+    db: Session = Depends(get_db)
+):
+    """
+    Lists available precomputed warm-start snapshots saved in model_states
+    (keys prefixed with 'warm_start:'), their metadata, updates, and condition numbers.
+    """
+    rows = db.query(ModelState).filter(ModelState.algorithm.like("warm_start:%")).all()
+    snapshots = []
+    for r in rows:
+        meta = {}
+        try:
+            parsed = json.loads(r.state_blob)
+            meta = parsed.get("metadata", {})
+        except Exception:
+            pass
+        snapshots.append({
+            "snapshot_key": r.algorithm,
+            "algorithm": meta.get("algorithm", r.algorithm.split(":")[-1]),
+            "n_updates": r.n_updates,
+            "condition_number": meta.get("condition_number"),
+            "scale_s": meta.get("scale_s"),
+            "n_hist": meta.get("n_hist"),
+            "n_cap": meta.get("n_cap"),
+            "lambda_reg": meta.get("lambda_reg"),
+            "alpha": meta.get("alpha"),
+            "pseudo_negatives_m": meta.get("pseudo_negatives_m"),
+            "feature_spec_hash": meta.get("feature_spec_hash"),
+            "created_at": meta.get("created_at") or (r.updated_at.isoformat() if r.updated_at else None),
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None
+        })
+    return snapshots
+
+
+@router.post("/models/warm-start/apply")
+def apply_warm_start(
+    req: WarmStartApplyRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Copies a specified warm-start snapshot into the active operational slot
+    for that algorithm. Requires admin authentication.
+    Creates an audit log record in model_history with origin='warm_start'.
+    """
+    snapshot = db.query(ModelState).filter(ModelState.algorithm == req.snapshot_key).first()
+    if not snapshot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Warm-start snapshot '{req.snapshot_key}' not found"
+        )
+
+    try:
+        payload = json.loads(snapshot.state_blob)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to deserialize snapshot state: {str(e)}"
+        )
+
+    metadata = payload.get("metadata", {})
+    model_state = payload.get("model_state", payload)
+    target_algo = req.target_algorithm or metadata.get("algorithm") or req.snapshot_key.split(":")[-1]
+
+    valid_algos = ["linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy"]
+    if target_algo not in valid_algos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Target algorithm '{target_algo}' is invalid. Must be one of {valid_algos}"
+        )
+
+    # Load state into active in-memory model
+    model = model_store.get_model(target_algo)
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Model store has no registered policy '{target_algo}'"
+        )
+    model.load_state(model_state)
+
+    # Persist into active model slot in database
+    active_row = db.query(ModelState).filter(ModelState.algorithm == target_algo).first()
+    now = datetime.now(timezone.utc)
+    if not active_row:
+        active_row = ModelState(
+            algorithm=target_algo,
+            state_blob=json.dumps(model_state),
+            n_updates=model.n_updates,
+            updated_at=now
+        )
+        db.add(active_row)
+    else:
+        active_row.state_blob = json.dumps(model_state)
+        active_row.n_updates = model.n_updates
+        active_row.updated_at = now
+
+    # Write audit log to model_history
+    audit_entry = ModelHistory(
+        algorithm=target_algo,
+        action="apply_warm_start",
+        snapshot_key=req.snapshot_key,
+        origin="warm_start",
+        metadata_json=metadata,
+        applied_by=current_admin.email,
+        created_at=now
+    )
+    db.add(audit_entry)
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Successfully applied warm-start snapshot '{req.snapshot_key}' to active '{target_algo}'",
+        "target_algorithm": target_algo,
+        "snapshot_key": req.snapshot_key,
+        "n_updates": model.n_updates,
+        "applied_by": current_admin.email,
+        "applied_at": now.isoformat()
+    }
+
