@@ -1,0 +1,4 @@
+mapping_method,version,popularity_ceiling_hr@10,popularity_baseline_hr@10,cold_linucb_hr@10,warm_linucb_hr@10,warm_lift_over_cold,warm_lift_over_popularity
+popularity_balanced_train,v1.0_train,0.07214581123440163,0.05788,0.0804,0.18348,0.10308,0.1256
+cooccurrence_cluster_train,v1.0_train,0.24870684004147647,0.23992,0.1228,0.25616,0.13335999999999998,0.016240000000000004
+category_rank_train,v1.0_train,0.2740456241135597,0.27052,0.09248,0.18768,0.0952,-0.08283999999999997

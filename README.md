@@ -465,7 +465,7 @@ SmartCart AI evaluates its adaptive recommendation engine through two complement
 2. **Hardened Proxy Offline Evaluation on Retailrocket Historical Data**: Evaluated on all **335,612 chronological test interactions** across **194,155 unique visitors** ($d=36$ feature space, `FEATURE_SPEC_HASH = 75f60ed70b2a`).
 
 > [!NOTE]
-> **Evaluation Framing**: Historical evaluations are strictly **proxy offline evaluations on logged positive-only interactions** (views, cart adds, transactions). They measure ranking performance under observed user trajectories, not counterfactual revenue. The system is tested and verified across 56 automated tests.
+> **Evaluation Framing**: Historical evaluations are strictly **proxy offline evaluations on logged positive-only interactions** (views, cart adds, transactions). They measure ranking performance under observed user trajectories, not counterfactual revenue. Under no circumstances is the system claimed to be "production-ready" or "causal". The system is tested and verified across 59 automated tests.
 
 ---
 
@@ -484,67 +484,78 @@ SmartCart AI evaluates its adaptive recommendation engine through two complement
 
 ### 9.2 Hardened Proxy Offline Evaluation (Full Test Split: $N=335,612$, $194,155$ Visitors)
 
-Following the Phase 9C measurement hardening, both **Visitor-Level (Macro)** and **Event-Level (Micro)** estimands are reported alongside **2,000-resample visitor-clustered 95% bootstrap confidence intervals**.
+Following the Phase 10A measurement audit and repair, both **Visitor-Level (Macro)** and **Event-Level (Micro)** estimands are reported alongside **2,000-resample visitor-clustered 95% bootstrap confidence intervals**.
 
 #### Full Catalog (262 SKUs) Ranking
 
-| Policy | Macro HR@10 (Headline) | 95% Bootstrap CI | Micro HR@10 | 95% Bootstrap CI | Macro NDCG@10 | Micro NDCG@10 | Macro MRR |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Warm LinUCB ($\alpha=0.5$)** | **10.79%** | $[10.68\%, 10.91\%]$ | **17.97%** | $[17.75\%, 18.21\%]$ | **0.0541** | **0.0925** | **0.0493** |
-| **Warm LinTS ($v=0.25$)** | 10.77% | $[10.65\%, 10.88\%]$ | 17.94% | $[17.72\%, 18.17\%]$ | 0.0538 | 0.0919 | 0.0497 |
-| **Warm Discounted LinUCB** | 10.79% | $[10.68\%, 10.91\%]$ | 17.97% | $[17.74\%, 18.22\%]$ | 0.0541 | 0.0925 | 0.0493 |
-| **Department Heuristic** | 7.48% | $[7.37\%, 7.58\%]$ | 9.76% | $[9.56\%, 9.95\%]$ | 0.0344 | 0.0452 | 0.0365 |
-| **Cold LinUCB ($\alpha=0.5$)** | 6.73% | $[6.63\%, 6.83\%]$ | 8.39% | $[8.24\%, 8.55\%]$ | 0.0312 | 0.0398 | 0.0330 |
-| **Hybrid (Dept $\times$ Pop)** | 6.72% | $[6.61\%, 6.82\%]$ | 7.83% | $[7.67\%, 8.00\%]$ | 0.0307 | 0.0357 | 0.0330 |
-| **Popularity Baseline** | 5.76% | $[5.66\%, 5.85\%]$ | 5.92% | $[5.81\%, 6.04\%]$ | 0.0264 | 0.0272 | 0.0300 |
-| **Control: Shuffled Context** | 5.44% | $[5.35\%, 5.53\%]$ | 5.39% | $[5.32\%, 5.47\%]$ | 0.0245 | 0.0243 | 0.0270 |
-| **Random Baseline** | 3.80% | $[3.72\%, 3.88\%]$ | 3.78% | $[3.72\%, 3.84\%]$ | 0.0172 | 0.0172 | 0.0197 |
-| **Control: Shuffled Rewards** | 3.80% | $[3.72\%, 3.88\%]$ | 3.50% | $[3.41\%, 3.60\%]$ | 0.0155 | 0.0154 | 0.0165 |
+| Policy | Macro HR@10 (Headline) | 95% Bootstrap CI | Micro HR@10 | 95% Bootstrap CI | Macro NDCG@10 | Micro NDCG@10 |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Warm LinUCB ($\alpha=0.5$)** | **9.54%** | $[9.43\%, 9.66\%]$ | **14.60%** | $[14.42\%, 14.79\%]$ | **0.0466** | **0.0734** |
+| **Warm LinTS ($v=0.25$)** | 9.29% | $[9.18\%, 9.40\%]$ | 14.38% | $[14.19\%, 14.57\%]$ | 0.0458 | 0.0728 |
+| **Warm LinUCB (Greedy $\alpha=0$)** | 9.49% | $[9.37\%, 9.60\%]$ | 14.55% | $[14.37\%, 14.75\%]$ | 0.0464 | 0.0732 |
+| **Department Heuristic** | 7.02% | $[6.92\%, 7.13\%]$ | 8.94% | $[8.77\%, 9.14\%]$ | 0.0323 | 0.0414 |
+| **Cold LinUCB ($\alpha=0.5$)** | 6.40% | $[6.30\%, 6.50\%]$ | 7.61% | $[7.48\%, 7.74\%]$ | 0.0295 | 0.0357 |
+| **Hybrid (Dept $\times$ Pop)** | 6.43% | $[6.33\%, 6.54\%]$ | 7.39% | $[7.23\%, 7.55\%]$ | 0.0295 | 0.0338 |
+| **Popularity Baseline** | 5.76% | $[5.66\%, 5.86\%]$ | 5.92% | $[5.81\%, 6.04\%]$ | 0.0264 | 0.0272 |
+| **Random Baseline** | 3.86% | $[3.79\%, 3.94\%]$ | 3.88% | $[3.82\%, 3.94\%]$ | 0.0176 | 0.0177 |
 
 #### Paired 50 Candidates Ranking
 
-| Policy | Macro HR@10 | 95% Bootstrap CI | Micro HR@10 | 95% Bootstrap CI | Macro NDCG@10 | Micro NDCG@10 | Macro MRR |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Warm LinTS ($v=0.25$)** | **28.00%** | $[27.82\%, 28.17\%]$ | **37.99%** | $[37.71\%, 38.26\%]$ | **0.1450** | **0.2138** | **0.1347** |
-| **Warm LinUCB ($\alpha=0.5$)** | 26.98% | $[26.80\%, 27.15\%]$ | 37.23% | $[36.96\%, 37.51\%]$ | 0.1417 | 0.2114 | 0.1333 |
-| **Department Heuristic** | 28.09% | $[27.91\%, 28.27\%]$ | 33.64% | $[33.38\%, 33.93\%]$ | 0.1332 | 0.1659 | 0.1208 |
-| **Cold LinUCB ($\alpha=0.5$)** | 25.79% | $[25.61\%, 25.98\%]$ | 29.03% | $[28.78\%, 29.25\%]$ | 0.1203 | 0.1397 | 0.1108 |
-| **Hybrid (Dept $\times$ Pop)** | 25.30% | $[25.12\%, 25.48\%]$ | 27.13% | $[26.88\%, 27.36\%]$ | 0.1169 | 0.1273 | 0.1091 |
-| **Popularity Baseline** | 24.03% | $[23.85\%, 24.21\%]$ | 24.58% | $[24.36\%, 24.81\%]$ | 0.1091 | 0.1117 | 0.1031 |
-| **Random Baseline** | 20.00% | $[19.84\%, 20.15\%]$ | 19.94% | $[19.80\%, 20.07\%]$ | 0.0906 | 0.0903 | 0.0897 |
+| Policy | Macro HR@10 | 95% Bootstrap CI | Micro HR@10 | 95% Bootstrap CI | Macro NDCG@10 | Micro NDCG@10 |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Department Heuristic** | **27.07%** | $[26.89\%, 27.25\%]$ | 31.79% | $[31.53\%, 32.04\%]$ | 0.1271 | 0.1549 |
+| **Warm LinTS ($v=0.25$)** | 26.79% | $[26.61\%, 26.97\%]$ | **34.14%** | $[33.88\%, 34.39\%]$ | 0.1347 | 0.1843 |
+| **Warm LinUCB ($\alpha=0.5$)** | 26.63% | $[26.44\%, 26.80\%]$ | 34.00% | $[33.75\%, 34.26\%]$ | **0.1351** | **0.1845** |
+| **Cold LinUCB ($\alpha=0.5$)** | 25.10% | $[24.93\%, 25.29\%]$ | 27.48% | $[27.26\%, 27.70\%]$ | 0.1164 | 0.1307 |
+| **Hybrid (Dept $\times$ Pop)** | 24.95% | $[24.77\%, 25.13\%]$ | 26.55% | $[26.30\%, 26.79\%]$ | 0.1147 | 0.1238 |
+| **Popularity Baseline** | 24.04% | $[23.86\%, 24.23\%]$ | 24.60% | $[24.37\%, 24.82\%]$ | 0.1091 | 0.1119 |
+| **Random Baseline** | 20.10% | $[19.94\%, 20.26\%]$ | 20.04% | $[19.90\%, 20.16\%]$ | 0.0915 | 0.0914 |
 
-*Statistical Significance*: All key paired differences at visitor level are statistically significant ($B=2,000$, empirical $p < 0.0005$):
-- **Warm LinUCB vs Cold LinUCB**: $\Delta = +4.06\%$ ($95\%$ CI: $[+3.92\%, +4.20\%]$).
-- **Warm LinUCB vs Popularity**: $\Delta = +5.03\%$ ($95\%$ CI: $[+4.91\%, +5.16\%]$).
-- **Warm LinUCB vs Department Heuristic**: $\Delta = +3.31\%$ ($95\%$ CI: $[+3.16\%, +3.46\%]$).
+*Key Nuance*: In 50 candidates, **Department Heuristic achieves superior visitor-level Macro HR@10 (27.07% vs 26.63%, $\Delta = -0.44\%$, $p < 0.0005$)** because casual visitors stay strictly within one category. However, **Warm LinUCB achieves higher event-level Micro HR@10 (34.00% vs 31.79%, $\Delta = +2.22\%$)**, reflecting personalized conversion depth on longer shopper journeys.
 
 ---
 
-### 9.3 Mapping Fairness & The Empirical Popularity Ceiling
+### 9.3 Repeat vs Novel Target Breakdown & Candidate Exclusion
 
-Historical evaluations compare three train-only mapping strategies against the **Test Popularity Ceiling** (maximum HR@10 achievable by recommending the top 10 most frequent items):
-- **Unflattened Mappings (`category_rank_train`, `cooccurrence_cluster_train`)**: Concentrated $>30\%$ of all volume into the top 10 catalog items (Gini $> 0.62$). On this skewed substrate, the static Popularity baseline achieves an inflated **$27.33\%$**, masking personalization benefits.
-- **Snake-Stride Balanced Mapping (`popularity_balanced_train`)**: Distributes historical volume evenly across all 262 SKUs (Gini $\approx 0.30$), lowering the Popularity ceiling to **$7.37\%$** and baseline to **$5.83\%$**. On this fair substrate, Warm LinUCB achieves **$17.70\%$**, demonstrating clear personalization lift.
+Of the $335,612$ sequential test events:
+- **Novel Targets**: **$263,849$ events ($78.62\%$)** — First interaction with the catalog SKU.
+- **Repeat Targets**: **$71,763$ events ($21.38\%$)** — Prior interaction in the test split ($67,729$ same item, $4,034$ aliased).
+
+| Setting Mode | Policy | Overall Macro HR@10 | Novel Macro HR@10 | Repeat Macro HR@10 |
+| :--- | :--- | :---: | :---: | :---: |
+| **Unconstrained** | Warm LinUCB | 9.54% | 5.77% | 52.72% |
+| **Candidate Exclusion** | Warm LinUCB | **9.22%** | **5.77%** | **49.32%** |
+| **Unconstrained** | Cold LinUCB | 6.40% | 5.60% | 15.92% |
+| **Candidate Exclusion** | Cold LinUCB | **6.30%** | **5.60%** | **14.89%** |
+| **Unconstrained** | Popularity | 5.76% | 5.76% | 5.99% |
+| **Candidate Exclusion** | Popularity | **5.72%** | **5.76%** | **5.67%** |
 
 ---
 
-### 9.4 Prequential Learning Velocity
+### 9.4 Feature Ablation Analysis & Neutral Mapping Framing
 
-Streaming replay over $20,000$ chronological steps reveals online learning speed:
-- Warm LinUCB stabilizes at **$14.00\%$** rolling HR@10 by step 250.
-- Cold LinUCB requires **$2,881$ sequential interactions** to reach the same $14.00\%$ threshold.
-- Warm-starting saves $\approx 2,880$ interaction rounds of low-conversion exploratory traffic.
+1. **Feature Group Ablations (25,000 Test Events)**:
+   - Full Warm LinUCB: **Macro HR@10 = 11.24%** (Micro 18.24%).
+   - Ablate Brand Affinity & Hash: Drops to **1.31%** (Micro 1.48%), proving brand features provide the primary candidate filter.
+   - Ablate Category Affinity: Drops to **7.26%** (Micro 15.41%).
+   - Intercept Only: Collapses to **3.80%**, exactly matching the theoretical random baseline floor ($10/262 = 3.82\%$).
+2. **Neutral Mapping Framing**:
+   - `category_rank_train` (Gini $0.6502$, Top-10 share $33.81\%$): Popularity ceiling reaches $27.40\%$; Popularity baseline achieves $27.05\%$.
+   - `popularity_balanced_train` (Gini $0.3059$, Top-10 share $6.61\%$): Popularity ceiling is $7.21\%$; Warm LinUCB achieves **$18.35\%$**.
+   - Both mappings are synthetic artifacts of projecting 124,882 items onto 262 SKUs and represent distinct experimental benchmarks.
+3. **Discounting Monotonic Degradation**:
+   - Validation sweep shows discounting degrades performance monotonically: $\gamma = 1.0 \rightarrow 5.20\%, \gamma = 0.9995 \rightarrow 4.61\%, \gamma = 0.9990 \rightarrow 4.14\%, \gamma = 0.9900 \rightarrow 4.04\%$. Cumulative standard LinUCB is the verified reference architecture.
 
 ---
 
 ### 9.5 Generated Research Plots
 
-All research plots are saved in `experiments/plots/retailrocket/` and `experiments/plots/`:
-1. `experiments/plots/retailrocket/bootstrap_ci_dual_9c.png`: Dual estimand comparison (Macro vs Micro) with 95% visitor-clustered error bars.
-2. `experiments/plots/retailrocket/prequential_hitrate_9c.png`: 20,000-step prequential learning curves showing cold-to-warm crossover.
-3. `experiments/plots/retailrocket/mapping_comparison_ceiling_9c.png`: Impact of mapping balance on popularity ceiling and bandit lift.
-4. `experiments/plots/retailrocket/feature_importance_9c.png`: Top 10 feature weights by absolute magnitude $|\hat{\theta}_i|$.
-5. `experiments/plots/learning_curves_cumulative_reward.png`: Simulation cumulative reward curves over 1,500 rounds.
+All research plots are saved in `experiments/plots/retailrocket/`:
+1. `experiments/plots/retailrocket/bootstrap_ci_dual_10a.png`: Dual estimand comparison (Macro vs Micro) with 95% visitor-clustered error bars.
+2. `experiments/plots/retailrocket/repeat_vs_novel_10a.png`: Disaggregated performance across novel vs repeat target subsets.
+3. `experiments/plots/retailrocket/prequential_hitrate_10a.png`: 20,000-step prequential learning curves showing cold-to-warm adaptation.
+4. `experiments/plots/retailrocket/feature_importance_10a.png`: Feature group ablation waterfall.
+5. `experiments/plots/retailrocket/mapping_comparison_ceiling_10a.png`: Train mapping balance vs empirical popularity ceiling.
 
 ---
 
