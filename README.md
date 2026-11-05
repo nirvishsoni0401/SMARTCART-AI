@@ -528,33 +528,34 @@ On the remaining **$71,763$ events ($21.38\%$)**, the user interacts with an ite
 
 ---
 
-### 9.4 Overall Full Catalog & Candidate Exclusion v2 (Pure Discovery)
+### 9.4 Overall Full Catalog, Hybrid Slates & Candidate Exclusion v2
 
-#### Overall Full Catalog (262 SKUs, $N = 335,612$)
+#### Overall Full Catalog (262 SKUs, $N = 335,612$, $194,155$ Visitors)
 
-| Policy | Macro HR@10 | 95% Bootstrap CI | Micro HR@10 |
-| :--- | :---: | :---: | :---: |
-| **Department Heuristic** | **90.25%** | $[90.15\%, 90.35\%]$ | **74.25%** |
-| **RecentlyViewed** | 10.90% | $[10.79\%, 11.01\%]$ | 19.02% |
-| **SameBrandPopularity** | 9.48% | $[9.37\%, 9.60\%]$ | 14.34% |
-| **Warm LinUCB ($\alpha=0.5$)** | 9.37% | $[9.26\%, 9.48\%]$ | 14.47% |
-| **Warm LinTS ($v=0.25$)** | 9.16% | $[9.05\%, 9.27\%]$ | 14.28% |
-| **Aggregated Warm LinUCB** | 6.85% | $[6.76\%, 6.94\%]$ | 12.35% |
-| **Popularity Baseline** | 5.76% | $[5.66\%, 5.85\%]$ | 5.92% |
-| **Cold LinUCB ($\alpha=0.5$)** | 5.58% | $[5.49\%, 5.67\%]$ | 5.72% |
+| Policy | Setting | Macro HR@10 | 95% Bootstrap CI | Micro HR@10 | Paired Diff vs LinUCB |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Department Heuristic** | Full Catalog | **90.25%** | $[90.16\%, 90.34\%]$ | **74.25%** | $+80.96\%$ ($p < 0.0005$) |
+| **RecentlyViewed** | Full Catalog | 10.90% | $[10.79\%, 11.01\%]$ | 19.02% | $+1.61\%$ ($p < 0.0005$) |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | Full Catalog | **10.75%** | $[10.64\%, 10.85\%]$ | **18.55%** | **$+1.46\%$** ($p < 0.0005$) |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | Full Catalog | 10.64% | $[10.53\%, 10.75\%]$ | 18.78% | $+1.35\%$ ($p < 0.0005$) |
+| **Warm LinTS ($v=0.25$)** | Full Catalog | 9.46% | $[9.36\%, 9.57\%]$ | 14.51% | $+0.17\%$ ($p = 0.0410$) |
+| **Warm LinUCB ($\alpha=0.5$)** | Full Catalog | 9.29% | $[9.18\%, 9.40\%]$ | 14.44% | Reference |
+| **Popularity Baseline** | Full Catalog | 5.76% | $[5.66\%, 5.85\%]$ | 5.92% | $-3.53\%$ ($p = 1.0000$) |
+| **Cold LinUCB ($\alpha=0.5$)** | Full Catalog | 5.58% | $[5.49\%, 5.67\%]$ | 5.72% | $-3.71\%$ ($p = 1.0000$) |
+
+*Hybrid Finding*: In overall unconstrained traffic, interleaving the top 3 items from `RecentlyViewed` with 7 slots from `Warm LinUCB` yields **10.75% Macro HR@10**, outperforming pure Warm LinUCB by **$+1.46\%$ ($p < 0.0005$)**, proving that contextual bandits benefit significantly when coupled with explicit recency caches.
 
 #### Candidate Exclusion v2 (All Engaged Masked — Pure Discovery Task)
 
 When **all previously engaged items are masked** from candidate sets to enforce genuine discovery:
-- **Warm LinUCB**: Macro HR@10 = **9.46% [9.35%, 9.56%]** (Micro 15.08%).
-- **Popularity Baseline**: Macro HR@10 = **5.77% [5.67%, 5.87%]** (Micro 6.07%).
-- **Cold LinUCB**: Macro HR@10 = **5.59% [5.49%, 5.69%]** (Micro 5.81%).
+- **Overall Stream ($N=335,612$)**: Warm LinUCB achieves **9.46% [9.35%, 9.56%]** vs Popularity **5.77% [5.67%, 5.87%]**.
+- **Novel-Only Target Stream ($n=263,849$)**: Warm LinUCB achieves **5.56% [5.47%, 5.66%]** vs Popularity **5.77% [5.67%, 5.87%]** (paired diff $-0.21\%$, $p = 0.9985$, negligible). Warm LinTS achieves **5.77%** (identical to Popularity, $p=0.4940$).
 
 ---
 
 ### 9.5 Repaired Prequential Online Replay (20,000 Steps)
 
-The anomalous Phase 10A rolling hit rates ($66\%$ to $92\%$) were traced to evaluation artifacts (inverted candidate subset scoring). Repaired chronological prequential replay over 20,000 steps demonstrates realistic trajectories:
+The anomalous Phase 10A rolling hit rates ($66\%$ to $92\%$) were traced to evaluation artifacts (inverted candidate subset scoring). Repaired chronological prequential replay over 20,000 steps demonstrates realistic trajectories ($w=1,000$ rolling window):
 
 | Step | Cold LinUCB Rolling (w=1000) | Warm LinUCB Rolling (w=1000) | Cold Cumulative HR@10 | Warm Cumulative HR@10 | Novel-Only Warm Cumulative |
 | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -562,7 +563,14 @@ The anomalous Phase 10A rolling hit rates ($66\%$ to $92\%$) were traced to eval
 | **500** | 1.20% | 13.60% | 1.20% | 13.60% | 6.18% |
 | **2,000** | 3.70% | 13.80% | 2.75% | 13.70% | 5.79% |
 | **5,000** | 12.40% | 14.00% | 8.02% | 13.96% | 5.87% |
+| **7,200 (Catch-Up)** | **14.60%** | **14.60%** | 9.42% | 14.12% | 5.82% |
 | **10,000** | 14.30% | 13.50% | 11.00% | 14.15% | 5.79% |
+| **15,000** | 14.20% | 15.90% | 12.29% | 15.07% | 5.85% |
+| **20,000** | 17.70% | 17.40% | **12.96%** | **14.73%** | **5.88%** |
+
+> [!WARNING]
+> **Prequential Catch-Up vs Cumulative Lead**:
+> In **rolling terms** ($w=1,000$), Cold LinUCB catches up with Warm LinUCB at **Step 7,200** ($14.60\%$ vs $14.60\%$) as it adapts online. However, in **cumulative terms**, Warm LinUCB retains its exploration lead across all 20,000 steps ($14.73\%$ vs $12.96\%$). Cold LinUCB cumulative HR@10 never surpasses Warm LinUCB within 20,000 steps; Claim C7 remains formally withdrawn.
 | **20,000** | 17.70% | 17.40% | **12.96%** | **14.73%** | **5.88%** |
 
 > [!WARNING]

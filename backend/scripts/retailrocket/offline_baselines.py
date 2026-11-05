@@ -67,7 +67,7 @@ class RecentlyViewedBaseline:
                     seen[pid] = len(history) - rank_pos
 
         for pid, boost in seen.items():
-            scores[self.pid_to_idx[pid]] += 1000.0 + boost
+            scores[self.pid_to_idx[pid]] += 10000.0 + boost * 1000.0
         return scores
 
 
