@@ -1,0 +1,7 @@
+metric,phase9c_reported,phase10a_reported,phase10b_verified,cause_of_change
+Warm LinUCB Macro HR@10,0.1079,0.0954,0.09366390647205264,"In 10A, a 30-min session inactivity reset was introduced, moving 32,255 events from warm to cold context (n_cold: 194,155 -> 226,410). Because cold context achieves lower HR (5.67%) than warm context (38.61% light, 29.38% heavy), overall HR fell."
+Warm LinUCB Micro HR@10,0.1797,0.146,0.14471473010500222,"Session reset shortened visitor history trajectories, reducing repeat identification during multi-day visits."
+Cold LinUCB Macro HR@10,0.0673,0.064,0.05578930038831925,Cold context slice expansion shifted visitor weighting.
+Popularity Baseline Macro HR@10,0.0576,0.0576,0.05755670266592754,Mathematically invariant: Popularity does not read visitor history or session state.
+Cold Context Slice Count,194155.0,226410.0,226410.0,"Phase 9C counted first visit only (1 per visitor). Phase 10A added 30-min inactivity reset (226,410 unique sessions)."
+Split Boundary T_val_end (ms),1440756710277.0,1440788640321.0,1440756710277.0,Typographical error in Phase 10A prose. Code and database always executed with T_val_end = 1440756710277. Splits never shifted.

@@ -1,0 +1,4 @@
+mapping_method,test_events_sampled,test_popularity_ceiling_hr@10,popularity_baseline_hr@10,warm_linucb_hr@10
+popularity_balanced_train,25000,0.07636,0.05944,0.05876
+cooccurrence_cluster_train,25000,0.251,0.24944,0.07324
+category_rank_train,25000,0.27588,0.14784,0.04244
