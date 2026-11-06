@@ -1,0 +1,24 @@
+SmartCart AI — Phase 11 Calibrated Simulator v2 Benchmark Summary
+-----------------------------------------------------------------
+Horizon: 20,000 rounds across 30 evaluation seeds (paired design).
+Tuned Hyper-parameters: alpha* = 0.25, gamma* = 0.9999
+
+Headline Cumulative Regret (Mean [95% CI]):
+  1. Oracle:                      159.5 (Regret == 0.0 identically)
+  2. Discounted LinUCB:           3,219.7 [2,873.8, 3,796.7]
+  3. Cold LinUCB:                 3,807.7 [3,161.7, 4,949.3]
+  4. Warm LinUCB (RR prior):      4,342.1 [3,716.2, 5,446.5]
+  5. Recently Viewed + Popularity:4,451.2 [4,357.3, 4,541.0]
+  6. Popularity Baseline:         6,555.3 [6,396.6, 6,708.5]
+
+Funnel Alignment (Simulated vs Retailrocket Anchors):
+  - Random Slate CTR: 5.14% (Target: 3% - 6%)
+  - Oracle Slate CTR: 20.67% (Target: 20% - 35%)
+  - P(Cart | Click):  2.29% (Anchor: ~2.6%)
+  - P(Tx | Cart):     35.67% (Anchor: ~32.4%)
+
+Key Takeaways:
+  - Discounted LinUCB adapts fastest to non-stationary preference drift.
+  - Warm LinUCB with Retailrocket prior incurs a misspecification penalty (+534.5 regret vs Cold LinUCB).
+  - Cold LinUCB discovers cold inventory (exposure 6.87% vs 0.00% for Popularity).
+  - Full reports and 6 publication plots saved in docs/ and experiments/plots/sim_v2/.

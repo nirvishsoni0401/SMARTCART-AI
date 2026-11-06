@@ -6,7 +6,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL--Mode-003B57.svg?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/Pytest-56%20Passed-brightgreen.svg)](backend/tests)
+[![Tests](https://img.shields.io/badge/Pytest-82%20Passed-brightgreen.svg)](backend/tests)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 SmartCart AI is a fully tested, verified, multi-category e-commerce web application featuring an adaptive recommendation engine powered by **Contextual Multi-Armed Bandits (LinUCB with Sherman-Morrison rank-1 updates)**. Designed to mirror enterprise e-commerce platforms like Amazon and Flipkart, it operates with Indian Rupee (₹) currency and supports six core retail departments: **Electronics, Fashion, Home & Kitchen, Beauty, Sports & Fitness, and Books** (262 active catalog SKUs: 157 DummyJSON + 105 seeded Books).
@@ -543,6 +543,24 @@ The Admin Dashboard is accessible at `http://localhost:5173/admin` (requires adm
 2. **Prequential Learning Catch-up**: Cold LinUCB's rolling learning rate enters within 1 SE of Warm LinUCB at Step 8,349, while Warm LinUCB maintains a persistent cumulative lead across all 20,000 steps.
 3. **Zero Novel Exploration Edge**: On pure novel discovery, Warm LinUCB and Popularity are statistically indistinguishable.
 4. **Repeat Dominance**: In e-commerce click logs, short-term recency accounts for the majority of recommendation hits.
+
+### 9.1 Calibrated Simulator v2 Benchmark Results (Phase 11)
+
+> [!NOTE]
+> **Scope**: Behaviour observed strictly within the calibrated position-biased simulator (`experiments/sim_v2/`).
+> Evaluated over **20,000 rounds** across **30 independent evaluation seeds** (paired common random numbers).
+> Not causal evidence of production customer behaviour.
+
+| Policy | Cumulative Regret (Mean [95% CI]) | Cumulative Reward | Slate CTR (%) | Diversity (Cats) | Latency (ms) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Oracle** | 159.5 [145.4, 170.1] | 10,628.7 | 20.67% | 1.38 | 0.256 |
+| **Discounted LinUCB** | 3,219.7 [2,873.8, 3,796.7] | 6,765.2 | 13.66% | 2.62 | 0.447 |
+| **Cold LinUCB** | 3,807.7 [3,161.7, 4,949.3] | 5,938.3 | 12.18% | 2.55 | 0.536 |
+| **Warm LinUCB** | 4,342.1 [3,716.2, 5,446.5] | 5,431.0 | 11.24% | 2.44 | 0.550 |
+| **Recently Viewed + Pop** | 4,451.2 [4,357.3, 4,541.0] | 5,471.0 | 11.43% | 1.58 | 0.180 |
+| **Popularity** | 6,555.3 [6,396.6, 6,708.5] | 2,982.0 | 6.44% | 1.00 | 0.176 |
+
+See [`docs/phase11-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/phase11-report.md) and [`docs/sim_assumptions.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/sim_assumptions.md) for complete details.
 
 ## 10. Assumptions & System Limitations
 
