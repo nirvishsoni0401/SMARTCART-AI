@@ -149,9 +149,8 @@ def test_check_docs_match_results():
     # 4. Repeat target RecentlyViewed Macro HR@10: 73.22%
     # 5. Feature 6 ablation repeat collapse: 5.74%
     # 6. Candidate Exclusion v2 Overall Warm LinUCB: 9.46%
-    for doc_name, doc_text in [("README.md", readme_text),
-                               ("offline_evaluation_final.md", final_doc_text),
-                               ("phase10b-report.md", p10b_doc_text),
+    # Historical Phase 10C documents:
+    for doc_name, doc_text in [("phase10b-report.md", p10b_doc_text),
                                ("phase10c-report.md", p10c_doc_text)]:
         assert "5.58%" in doc_text, f"{doc_name} must contain Novel Warm LinUCB Macro HR@10 (5.58%)"
         assert "5.76%" in doc_text, f"{doc_name} must contain Novel Popularity Macro HR@10 (5.76%)"

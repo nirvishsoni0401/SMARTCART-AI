@@ -1,0 +1,32 @@
+SMARTCART AI — PHASE 10D MASTER RESULTS SUMMARY
+================================================================================
+AUTHORITATIVE KEY NUMBERS (Auto-generated from offline_master_results.json):
+
+1. DATASET EVENT & VISITOR COUNTS:
+   - Total Test Events (n):              335,612
+   - Total Test Visitors (n_v):          194,155
+   - Novel Target Events (n):            263,849
+   - Novel Target Visitors (n_v):        194,155
+   - Repeat Target Events (n):           71,763
+   - Repeat Target Visitors (n_v):       31,609
+   - Cold Context Session Starts (n):    226,410
+   - First Exposure Events (n):          287,176
+
+2. LIFETIME HISTORY HEADLINE METRICS (Full Catalog Unconstrained):
+   - Popularity Baseline:       Overall Macro=5.76% (Micro=5.92%) | Novel Macro=5.76% | Repeat Macro=5.99%
+   - Department Heuristic:      Overall Macro=7.46% (Micro=10.12%) | Novel Macro=6.42% | Repeat Macro=20.28%
+   - RecentlyViewed Baseline:   Overall Macro=13.10% (Micro=24.97%) | Novel Macro=5.66% | Repeat Macro=99.81%
+   - Cold LinUCB (alpha=0.5):   Overall Macro=6.73% (Micro=8.39%) | Novel Macro=5.60%
+   - Warm LinUCB (Frozen):      Overall Macro=11.20% (Micro=18.33%) | Novel Macro=5.82% | Repeat Macro=71.36%
+   - Warm LinTS (v=0.25):       Overall Macro=11.07% (Micro=18.21%) | Novel Macro=5.75%
+   - Hybrid Slate (k=3 RV+Lin): Overall Macro=13.16% (Micro=24.41%)
+   - Hybrid Slate (k=5 RV+Lin): Overall Macro=13.01% (Micro=24.67%)
+
+3. 30-MINUTE SESSION HISTORY PARITY:
+   - RecentlyViewed Repeat:     Macro=73.23% (Micro=68.71%) [vs Lifetime 99.81%]
+   - Hybrid Slate (k=3):        Overall Macro=10.98% (Micro=18.92%)
+
+4. VALIDATION GAMMA SWEEP & PREQUENTIAL REPLAY:
+   - Best Validation Gamma:     gamma=1.0000 (HR@10=16.23%)
+   - Prequential Catch-Up Step: Step 8349 (Cold rolling HR enters within 1 SE of Warm rolling HR)
+================================================================================

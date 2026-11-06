@@ -458,166 +458,91 @@ The Admin Dashboard is accessible at `http://localhost:5173/admin` (requires adm
 
 ---
 
-## 9. Empirical Benchmark Results & Frozen Offline Evaluation
-
-SmartCart AI evaluates its adaptive recommendation engine through two complementary methodologies:
-1. **Online Synthetic Simulation Suite**: 5 random seeds, 1,500 rounds per algorithm, measuring cumulative reward, regret, and preference drift adaptation.
-2. **Hardened Proxy Offline Evaluation on Retailrocket Historical Data**: Evaluated on all **335,612 chronological test interactions** across **194,155 unique visitors** ($d=36$ feature space, `FEATURE_SPEC_HASH = 75f60ed70b2a`, frozen configuration $N_{\text{cap}} = 10,000, m = 3, \lambda = 1.0, \alpha = 0.5$).
-
-> [!NOTE]
-> **Evaluation Protocol & Framing**:
-> Historical evaluations are strictly **proxy offline evaluations on logged positive-only interactions** (views, cart adds, transactions). They measure ranking performance under observed user trajectories, not counterfactual revenue. Under no circumstances is the system claimed to be "production-ready" or "causal". The system is tested and verified across 64 automated tests.
-> 
-> **Status**: **PERMANENTLY FROZEN (Phase 10B)** — No further evaluation phases.
-
----
-
-### 9.1 Multi-Armed Bandit Online Simulation Summary
-
-| Algorithm | Cumulative Reward | Cumulative Regret | CTR (%) | Conv. Rate (%) | NDCG@10 | Intra-List Div. | Catalog Cov. (%) | Latency (ms) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **LinUCB (Sherman-Morrison)** | **6,590.8 ± 152.4** | **3,931.2 ± 109.8** | **84.19%** | **34.26%** | **0.6816** | 0.8811 | 61.14% | **0.30 ms** |
-| **Discounted LinUCB ($\gamma=0.95$)** | 6,171.0 ± 118.4 | 4,195.7 ± 73.9 | 81.87% | 32.23% | 0.6735 | 0.8560 | **99.87%** | **0.27 ms** |
-| **Lin Thompson Sampling (LinTS)** | 6,587.6 ± 326.2 | 3,953.9 ± 160.0 | **84.33%** | **34.53%** | **0.6863** | 0.8617 | 61.90% | 1.27 ms |
-| **Epsilon-Greedy ($\epsilon=0.10$)** | 6,564.8 ± 167.1 | 3,956.0 ± 104.4 | 83.80% | 34.37% | 0.6815 | 0.8301 | 69.68% | 0.14 ms |
-| **Popularity Baseline** | 6,033.8 ± 149.8 | 4,227.3 ± 88.9 | 82.32% | 30.06% | 0.6757 | 0.9153 | 31.87% | 0.12 ms |
-| **Uniform Random Policy** | 5,537.0 ± 37.3 | 4,599.9 ± 15.6 | 78.29% | 29.04% | 0.6629 | **0.9553** | 100.00% | 0.10 ms |
-
----
-
-### 9.2 Primary Headline: Evaluation on NOVEL Targets (Discovery First)
-
-In e-commerce recommendation, discovery performance on **unviewed products** is the primary benchmark. Of the $335,612$ sequential test interactions, **$263,849$ events ($78.62\%$)** are novel targets where the customer has never previously interacted with the catalog product.
-
-Following the Phase 10B frozen evaluation protocol, both **Visitor-Level (Macro)** and **Event-Level (Micro)** estimands are reported alongside **2,000-resample visitor-clustered 95% bootstrap confidence intervals**.
-
-#### Full Catalog (262 SKUs) Ranking — Novel Targets Only ($n = 263,849$)
-
-| Policy | Macro HR@10 (Headline) | 95% Bootstrap CI | Micro HR@10 | Paired Macro Diff vs Pop | p-value | Significance |
-| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Popularity Baseline** | **5.76%** | $[5.66\%, 5.85\%]$ | 5.86% | Reference | — | Reference |
-| **SameBrandPopularity** | 5.86% | $[5.76\%, 5.96\%]$ | 6.14% | $+0.10\%$ | $0.082$ | Negligible ($< 0.5\%$) |
-| **RecentlyViewed** | 5.69% | $[5.59\%, 5.78\%]$ | 5.55% | $-0.07\%$ | $0.854$ | Negligible ($< 0.5\%$) |
-| **Warm LinUCB ($\alpha=0.5$)** | 5.58% | $[5.48\%, 5.67\%]$ | 5.88% | $-0.18\%$ | $0.999$ | Negligible ($< 0.5\%$) |
-| **Cold LinUCB ($\alpha=0.5$)** | 5.57% | $[5.48\%, 5.67\%]$ | 5.65% | $-0.19\%$ | $0.998$ | Negligible ($< 0.5\%$) |
-| **Warm LinTS ($v=0.25$)** | 5.39% | $[5.30\%, 5.48\%]$ | 5.72% | $-0.36\%$ | $1.000$ | Negligible ($< 0.5\%$) |
-| **Aggregated Warm LinUCB** | 3.11% | $[3.04\%, 3.18\%]$ | 3.74% | $-2.65\%$ | $< 0.001$ | Statistically Inferior |
+## 9. Offline Evaluation & Research Findings (Retailrocket)
 
 > [!IMPORTANT]
-> **Key Finding on Novel Discovery**:
-> On novel target interactions ($78.62\%$ of events), **Warm LinUCB achieves 5.58% Macro HR@10 vs Popularity Baseline 5.76%** (paired difference $-0.18\%$, $p = 0.999$, negligible size). The contextual bandit provides **zero discovery advantage** over a static popularity baseline when recommending unviewed products.
+> **PERMANENT FREEZE DECLARATION**: All offline evaluation on Retailrocket proxy data is **permanently frozen**. All reported figures are strictly **proxy offline evaluations on logged positive-only interactions**. Neither offline nor live models are described as 'production-ready', and no result is claimed to be 'causal'. All figures in this section are auto-generated from `experiments/results/offline_master_results.json`.
 
----
+### 9.1 Authoritative Dataset Counts
 
-### 9.3 Repeat Targets Breakdown: The Recency Cache Dominance
+| Slice | Events ($n$) | Visitors ($n_v$) | Description |
+| :--- | :--- | :--- | :--- |
+| **Total Test Stream** | 335,612 | 194,155 | Full held-out test split |
+| **Novel Targets** | 263,849 | 194,155 | First time product seen by visitor |
+| **Repeat Targets** | 71,763 | 31,609 | Product previously engaged by visitor |
+| **Cold Context** | 226,410 | 194,155 | Session-starting events (history length 0) |
 
-On the remaining **$71,763$ events ($21.38\%$)**, the user interacts with an item previously seen in their session or history:
+### 9.2 Lifetime History Headline Results (Full Catalog Unconstrained)
 
-| Policy | Macro HR@10 | 95% Bootstrap CI | Micro HR@10 | Advantage over Warm LinUCB |
-| :--- | :---: | :---: | :---: | :---: |
-| **RecentlyViewed** (LRU cache) | **73.22%** | $[72.77\%, 73.66\%]$ | **68.57%** | **$+20.44\%$** |
-| **Warm LinUCB ($\alpha=0.5$)** | 52.78% | $[52.26\%, 53.29\%]$ | 46.04% | Reference |
-| **Warm LinTS ($v=0.25$)** | 52.45% | $[51.94\%, 52.95\%]$ | 45.76% | $-0.33\%$ |
-| **Aggregated Warm LinUCB** | 50.44% | $[49.91\%, 50.96\%]$ | 44.03% | $-2.34\%$ |
-| **SameBrandPopularity** | 50.33% | $[49.80\%, 50.86\%]$ | 44.49% | $-2.45\%$ |
-| **DepartmentRecency** | 16.79% | $[16.40\%, 17.20\%]$ | 16.47% | $-35.99\%$ |
-| **Popularity Baseline** | 5.99% | $[5.72\%, 6.25\%]$ | 6.16% | $-46.79\%$ |
-| **Cold LinUCB ($\alpha=0.5$)** | 5.85% | $[5.60\%, 6.10\%]$ | 5.98% | $-46.93\%$ |
+| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
+| :--- | :--- | :--- | :--- | :--- |
+| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.92% | [5.80%, 6.04%] |
+| **Department Heuristic** | 7.46% | [7.35%, 7.56%] | 10.12% | [9.93%, 10.31%] |
+| **RecentlyViewed** | 13.10% | [12.99%, 13.24%] | 24.97% | [24.69%, 25.27%] |
+| **Cold LinUCB** | 6.73% | [6.63%, 6.83%] | 8.39% | [8.23%, 8.55%] |
+| **Warm LinUCB** | 11.20% | [11.08%, 11.32%] | 18.33% | [18.08%, 18.57%] |
+| **Warm LinTS (v=0.25)** | 11.07% | [10.95%, 11.19%] | 18.21% | [17.98%, 18.44%] |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 13.16% | [13.04%, 13.29%] | 24.41% | [24.16%, 24.68%] |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 13.01% | [12.89%, 13.13%] | 24.67% | [24.41%, 24.95%] |
 
-*Takeaway*: While Warm LinUCB appears strong on repeats ($52.78\%$), it is vastly outperformed by a simple `RecentlyViewed` recency heuristic ($73.22\%$, $+20.44\%$ higher). The contextual bandit cannot be justified as an optimal mechanism for repeat item recommendations when an LRU cache trivially outperforms it.
+### 9.3 Novel Target Discovery vs Repeat Intent
 
----
+#### Novel Target Events (Unseen by Shopper)
+| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
+| :--- | :--- | :--- | :--- | :--- |
+| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.86% | [5.77%, 5.95%] |
+| **Department Heuristic** | 6.42% | [6.32%, 6.52%] | 7.57% | [7.47%, 7.68%] |
+| **RecentlyViewed** | 5.66% | [5.57%, 5.76%] | 5.42% | [5.33%, 5.51%] |
+| **Cold LinUCB** | 5.60% | [5.51%, 5.70%] | 5.72% | [5.63%, 5.80%] |
+| **Warm LinUCB** | 5.82% | [5.72%, 5.92%] | 6.13% | [6.04%, 6.22%] |
+| **Warm LinTS (v=0.25)** | 5.75% | [5.65%, 5.84%] | 6.05% | [5.95%, 6.14%] |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 5.83% | [5.74%, 5.93%] | 5.94% | [5.85%, 6.03%] |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 5.58% | [5.49%, 5.68%] | 5.59% | [5.50%, 5.68%] |
 
-### 9.4 Overall Full Catalog, Hybrid Slates & Candidate Exclusion v2
+#### Repeat Target Events (Previously Seen by Shopper)
+| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
+| :--- | :--- | :--- | :--- | :--- |
+| **Popularity Baseline** | 5.99% | [5.75%, 6.25%] | 6.16% | [5.82%, 6.51%] |
+| **Department Heuristic** | 20.28% | [19.83%, 20.68%] | 19.50% | [18.86%, 20.16%] |
+| **RecentlyViewed** | 99.81% | [99.78%, 99.84%] | 96.84% | [95.49%, 97.86%] |
+| **Cold LinUCB** | 19.71% | [19.27%, 20.13%] | 18.23% | [17.61%, 18.84%] |
+| **Warm LinUCB** | 71.36% | [70.87%, 71.81%] | 63.18% | [61.77%, 64.42%] |
+| **Warm LinTS (v=0.25)** | 70.76% | [70.27%, 71.23%] | 62.92% | [61.54%, 64.11%] |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 98.28% | [98.17%, 98.39%] | 92.30% | [90.94%, 93.40%] |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 99.31% | [99.25%, 99.38%] | 94.80% | [93.44%, 95.90%] |
 
-#### Overall Full Catalog (262 SKUs, $N = 335,612$, $194,155$ Visitors)
+### 9.4 30-Minute Session History Parity
 
-| Policy | Setting | Macro HR@10 | 95% Bootstrap CI | Micro HR@10 | Paired Diff vs LinUCB |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **Department Heuristic** | Full Catalog | **90.25%** | $[90.16\%, 90.34\%]$ | **74.25%** | $+80.96\%$ ($p < 0.0005$) |
-| **RecentlyViewed** | Full Catalog | 10.90% | $[10.79\%, 11.01\%]$ | 19.02% | $+1.61\%$ ($p < 0.0005$) |
-| **Hybrid Slate (k=3 RV + 7 LinUCB)** | Full Catalog | **10.75%** | $[10.64\%, 10.85\%]$ | **18.55%** | **$+1.46\%$** ($p < 0.0005$) |
-| **Hybrid Slate (k=5 RV + 5 LinUCB)** | Full Catalog | 10.64% | $[10.53\%, 10.75\%]$ | 18.78% | $+1.35\%$ ($p < 0.0005$) |
-| **Warm LinTS ($v=0.25$)** | Full Catalog | 9.46% | $[9.36\%, 9.57\%]$ | 14.51% | $+0.17\%$ ($p = 0.0410$) |
-| **Warm LinUCB ($\alpha=0.5$)** | Full Catalog | 9.29% | $[9.18\%, 9.40\%]$ | 14.44% | Reference |
-| **Popularity Baseline** | Full Catalog | 5.76% | $[5.66\%, 5.85\%]$ | 5.92% | $-3.53\%$ ($p = 1.0000$) |
-| **Cold LinUCB ($\alpha=0.5$)** | Full Catalog | 5.58% | $[5.49\%, 5.67\%]$ | 5.72% | $-3.71\%$ ($p = 1.0000$) |
+| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
+| :--- | :--- | :--- | :--- | :--- |
+| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.92% | [5.80%, 6.04%] |
+| **Department Heuristic** | 6.99% | [6.89%, 7.09%] | 9.12% | [8.94%, 9.30%] |
+| **RecentlyViewed** | 10.90% | [10.79%, 11.02%] | 19.05% | [18.83%, 19.30%] |
+| **Cold LinUCB** | 6.40% | [6.30%, 6.49%] | 7.61% | [7.48%, 7.75%] |
+| **Warm LinUCB** | 9.57% | [9.46%, 9.68%] | 14.68% | [14.50%, 14.87%] |
+| **Warm LinTS (v=0.25)** | 9.45% | [9.33%, 9.55%] | 14.53% | [14.36%, 14.71%] |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 10.98% | [10.86%, 11.09%] | 18.92% | [18.71%, 19.15%] |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 10.80% | [10.68%, 10.91%] | 18.95% | [18.73%, 19.18%] |
 
-*Hybrid Finding*: In overall unconstrained traffic, interleaving the top 3 items from `RecentlyViewed` with 7 slots from `Warm LinUCB` yields **10.75% Macro HR@10**, outperforming pure Warm LinUCB by **$+1.46\%$ ($p < 0.0005$)**, proving that contextual bandits benefit significantly when coupled with explicit recency caches.
+### 9.5 Prequential Online Learning Trajectories
 
-#### Candidate Exclusion v2 (All Engaged Masked — Pure Discovery Task)
+*Rolling window $w=1000$. First step where Cold rolling HR enters within 1 SE of Warm rolling HR: **Step 8,349**.*
 
-When **all previously engaged items are masked** from candidate sets to enforce genuine discovery:
-- **Overall Stream ($N=335,612$)**: Warm LinUCB achieves **9.46% [9.35%, 9.56%]** vs Popularity **5.77% [5.67%, 5.87%]**.
-- **Novel-Only Target Stream ($n=263,849$)**: Warm LinUCB achieves **5.56% [5.47%, 5.66%]** vs Popularity **5.77% [5.67%, 5.87%]** (paired diff $-0.21\%$, $p = 0.9985$, negligible). Warm LinTS achieves **5.77%** (identical to Popularity, $p=0.4940$).
+| Step | Cold Rolling HR@10 | Warm Rolling HR@10 | Cold Cumulative HR@10 | Warm Cumulative HR@10 | Novel-Only Cold Cum | Novel-Only Warm Cum |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **2,500** | 7.50% | 16.60% | 4.04% | 14.64% | 1.68% | 6.43% |
+| **5,000** | 11.90% | 15.70% | 7.80% | 14.94% | 2.17% | 6.34% |
+| **7,500** | 14.10% | 16.30% | 9.69% | 15.56% | 2.49% | 6.45% |
+| **10,000** | 14.10% | 16.00% | 10.72% | 15.64% | 2.66% | 6.44% |
+| **15,000** | 14.30% | 16.50% | 12.23% | 16.07% | 3.27% | 6.38% |
+| **20,000** | 17.70% | 17.80% | 13.06% | 16.15% | 3.59% | 5.96% |
 
----
+### 9.6 Key Empirical Findings
 
-### 9.5 Repaired Prequential Online Replay (20,000 Steps)
-
-The anomalous Phase 10A rolling hit rates ($66\%$ to $92\%$) were traced to evaluation artifacts (inverted candidate subset scoring). Repaired chronological prequential replay over 20,000 steps demonstrates realistic trajectories ($w=1,000$ rolling window):
-
-| Step | Cold LinUCB Rolling (w=1000) | Warm LinUCB Rolling (w=1000) | Cold Cumulative HR@10 | Warm Cumulative HR@10 | Novel-Only Warm Cumulative |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| **100** | 0.00% | 10.00% | 0.00% | 10.00% | 8.51% |
-| **500** | 1.20% | 13.60% | 1.20% | 13.60% | 6.18% |
-| **2,000** | 3.70% | 13.80% | 2.75% | 13.70% | 5.79% |
-| **5,000** | 12.40% | 14.00% | 8.02% | 13.96% | 5.87% |
-| **7,200 (Catch-Up)** | **14.60%** | **14.60%** | 9.42% | 14.12% | 5.82% |
-| **10,000** | 14.30% | 13.50% | 11.00% | 14.15% | 5.79% |
-| **15,000** | 14.20% | 15.90% | 12.29% | 15.07% | 5.85% |
-| **20,000** | 17.70% | 17.40% | **12.96%** | **14.73%** | **5.88%** |
-
-> [!WARNING]
-> **Prequential Catch-Up vs Cumulative Lead**:
-> In **rolling terms** ($w=1,000$), Cold LinUCB catches up with Warm LinUCB at **Step 7,200** ($14.60\%$ vs $14.60\%$) as it adapts online. However, in **cumulative terms**, Warm LinUCB retains its exploration lead across all 20,000 steps ($14.73\%$ vs $12.96\%$). Cold LinUCB cumulative HR@10 never surpasses Warm LinUCB within 20,000 steps; Claim C7 remains formally withdrawn.
-| **20,000** | 17.70% | 17.40% | **12.96%** | **14.73%** | **5.88%** |
-
-> [!WARNING]
-> **Prequential Crossover Claim Withdrawn**:
-> Cold LinUCB cumulative HR@10 **never surpasses Warm LinUCB** within 20,000 test steps (Cold reaches $12.96\%$ vs Warm $14.73\%$). While Cold's rolling window approaches Warm due to repeat interaction learning, cumulative performance remains lower. Phase 10A Claim C7 is formally withdrawn.
-
----
-
-### 9.6 Valid Leave-Group-Out Ridge Refit Ablations
-
-Previous ablations zeroed feature columns at test time without refitting, causing dot-product mismatch. Phase 10B performs mathematically valid **leave-group-out Ridge refits** using sliced sufficient statistics $(A_{\text{sub}} + \lambda I)^{-1} b_{\text{sub}}$ evaluated across all $335,612$ test events:
-
-| Ablation Configuration | Dim $d$ | Overall Macro HR@10 | Novel Macro HR@10 | Repeat Macro HR@10 | Relative Repeat Impact |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **All Features (Full Model)** | 36 | 9.37% | 5.58% | 52.78% | Baseline |
-| **Ablate: Category Affinities** | 30 | 9.15% | 5.37% | 52.84% | $+0.1\%$ |
-| **Ablate: Brand Affinity (Feature 6)** | 35 | **5.63%** | **5.63%** | **5.74%** | **$-89.1\%$ (Collapse)** |
-| **Ablate: Price & Budget Group** | 32 | 9.36% | 5.56% | 53.00% | $+0.4\%$ |
-| **Ablate: Product Category One-Hot** | 30 | 9.56% | 5.92% | 51.37% | $-2.7\%$ |
-| **Ablate: Price, Rating, Discount** | 33 | 9.38% | 5.57% | 52.89% | $+0.2\%$ |
-| **Ablate: Product Popularity** | 35 | 9.34% | 5.57% | 52.71% | $-0.1\%$ |
-| **Ablate: Brand Hash Buckets** | 28 | 9.00% | 5.21% | 52.64% | $-0.3\%$ |
-| **Ablate: Session & Intent Features** | 33 | 9.37% | 5.58% | 52.78% | $0.0\%$ |
-| **Ablate: High Boosts & New Flag** | 33 | 9.37% | 5.57% | 52.79% | $0.0\%$ |
-
-*Mechanistic Explanation*: Feature 6 (`user_brand_affinity`) is non-zero for **100.0% of repeat events** (mean $0.9177$), but only **5.72% of novel events** (mean $0.0465$). The Ridge solver assigns $\theta_6 = 1.28$, turning Feature 6 into a massive repeat-intent booster (+1.18 score boost). Slicing out Feature 6 collapses repeat HR from $52.78\%$ to $5.74\%$ while novel HR is completely untouched ($5.58\% \rightarrow 5.63\%$).
-
----
-
-### 9.7 Cold-Start Shrinkage Hypothesis Confirmation
-
-- **Hypothesis**: The Cold LinUCB score ($\alpha \|\phi\|_2$) acts as an implicit popularity prior because higher-rated, discounted catalog products have larger feature norms.
-- **Empirical Result**: Spearman rank correlation between cold-start feature norms and catalog popularity priors is **$r = 0.7126$ ($p = 6.59 \times 10^{-42}$)**, confirming the hypothesis.
-
----
-
-### 9.8 Generated Publication Research Figures
-
-All Phase 10B figures are generated at 300 DPI in `experiments/plots/retailrocket/`:
-1. `novel_first_headline_10b.png`: Primary headline comparison on novel targets with visitor-clustered 95% error bars.
-2. `repeat_vs_novel_baselines_10b.png`: Disaggregated breakdown showing `RecentlyViewed` dominating repeats.
-3. `prequential_hitrate_10b.png`: Repaired 20,000-step prequential learning curves (no crossover).
-4. `valid_ablations_refit_10b.png`: Leave-group-out Ridge refit waterfall across feature groups.
-5. `cold_start_shrinkage_correlation_10b.png`: Scatter and trend confirming $r = 0.7126$ popularity prior correlation.
-6. `candidate_exclusion_v2_discovery_10b.png`: Pure discovery task performance under full engagement masking.
-
----
+1. **Recency-Bandit Hybrid Dominance**: Reserving top slots for RecentlyViewed while using LinUCB for discovery statistically significantly outperforms pure LinUCB on overall traffic ($p < 0.0005$).
+2. **Prequential Learning Catch-up**: Cold LinUCB's rolling learning rate enters within 1 SE of Warm LinUCB at Step 8,349, while Warm LinUCB maintains a persistent cumulative lead across all 20,000 steps.
+3. **Zero Novel Exploration Edge**: On pure novel discovery, Warm LinUCB and Popularity are statistically indistinguishable.
+4. **Repeat Dominance**: In e-commerce click logs, short-term recency accounts for the majority of recommendation hits.
 
 ## 10. Assumptions & System Limitations
 

@@ -36,7 +36,25 @@ class DepartmentHeuristicBaseline:
         self.pid_to_idx = {pid: i for i, pid in enumerate(idx_to_pid)}
         self.priors = np.array([catalog[p].get("popularity_prior", 0.0) for p in idx_to_pid], dtype=np.float64)
 
+    def score(self, history: Optional[List[Any]] = None) -> np.ndarray:
+        """
+        True history-dependent department heuristic:
+        Boosts products matching the category of the most recently viewed item in history (strictly tau < t).
+        If history is empty, falls back to catalog popularity priors.
+        """
+        scores = self.priors.copy()
+        if not history:
+            return scores
+        recent_item = history[-1]
+        prod = recent_item[0] if isinstance(recent_item, (tuple, list)) else getattr(recent_item, "product", recent_item)
+        cat = prod["category"] if isinstance(prod, dict) else getattr(prod, "category", "")
+        if cat and cat in self.dept_pids:
+            for p in self.dept_pids[cat]:
+                scores[self.pid_to_idx[p]] += 100.0
+        return scores
+
     def score_for_target_dept(self, target_dept: str) -> np.ndarray:
+        """DEPRECATED: Leaks future target category. Preserved strictly for reproduction of Phase 10C bug."""
         scores = self.priors.copy()
         if target_dept in self.dept_pids:
             for p in self.dept_pids[target_dept]:
