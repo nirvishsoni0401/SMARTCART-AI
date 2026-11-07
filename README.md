@@ -544,23 +544,24 @@ The Admin Dashboard is accessible at `http://localhost:5173/admin` (requires adm
 3. **Zero Novel Exploration Edge**: On pure novel discovery, Warm LinUCB and Popularity are statistically indistinguishable.
 4. **Repeat Dominance**: In e-commerce click logs, short-term recency accounts for the majority of recommendation hits.
 
-### 9.1 Calibrated Simulator v2 Benchmark Results (Phase 11)
+### 9.1 Calibrated Simulator v2 Benchmark Results (Phase 11B)
 
 > [!NOTE]
 > **Scope**: Behaviour observed strictly within the calibrated position-biased simulator (`experiments/sim_v2/`).
-> Evaluated over **20,000 rounds** across **30 independent evaluation seeds** (paired common random numbers).
+> Evaluated over **20,000 rounds** across **30 independent evaluation seeds** (paired Common Random Numbers).
+> Condition: **Abrupt Preference Drift**, **Medium Difficulty** ($\sigma = 0.40$), Full Catalog (262 SKUs).
 > Not causal evidence of production customer behaviour.
 
-| Policy | Cumulative Regret (Mean [95% CI]) | Cumulative Reward | Slate CTR (%) | Diversity (Cats) | Latency (ms) |
+| Policy | Cumulative Regret (Mean [95% CI]) | Cumulative Expected Reward | Slate CTR (%) | Diversity (Cats) | Latency (ms) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Oracle** | 159.5 [145.4, 170.1] | 10,628.7 | 20.67% | 1.38 | 0.256 |
-| **Discounted LinUCB** | 3,219.7 [2,873.8, 3,796.7] | 6,765.2 | 13.66% | 2.62 | 0.447 |
-| **Cold LinUCB** | 3,807.7 [3,161.7, 4,949.3] | 5,938.3 | 12.18% | 2.55 | 0.536 |
-| **Warm LinUCB** | 4,342.1 [3,716.2, 5,446.5] | 5,431.0 | 11.24% | 2.44 | 0.550 |
-| **Recently Viewed + Pop** | 4,451.2 [4,357.3, 4,541.0] | 5,471.0 | 11.43% | 1.58 | 0.180 |
-| **Popularity** | 6,555.3 [6,396.6, 6,708.5] | 2,982.0 | 6.44% | 1.00 | 0.176 |
+| **Oracle** | 0.0 [0.0, 0.0] | 8,132.7 | 17.39% | 1.18 | 0.147 |
+| **Discounted LinUCB** | 2,839.7 [2,736.9, 2,933.3] | 5,026.5 | 11.18% | 2.59 | 0.538 |
+| **Cold LinUCB** | 2,872.4 [2,802.7, 2,950.7] | 5,003.4 | 11.17% | 2.58 | 0.857 |
+| **Warm LinUCB** | 3,322.2 [3,218.8, 3,434.5] | 4,546.2 | 10.14% | 2.79 | 0.869 |
+| **Recently Viewed + Pop** | 4,925.1 [4,907.7, 4,947.0] | 2,671.5 | 6.21% | 1.00 | 0.291 |
+| **Popularity** | 4,989.5 [4,971.7, 5,012.4] | 2,608.7 | 6.07% | 1.00 | 0.257 |
 
-See [`docs/phase11-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/phase11-report.md) and [`docs/sim_assumptions.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/sim_assumptions.md) for complete details.
+See [`docs/phase11b-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/phase11b-report.md) and [`docs/sim_assumptions.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/sim_assumptions.md) for complete details.
 
 ## 10. Assumptions & System Limitations
 

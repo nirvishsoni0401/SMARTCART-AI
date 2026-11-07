@@ -111,7 +111,9 @@ class EnvironmentV2:
         drift_round: int = 10000,
         horizon: int = 20000,
         seed: int = 42,
-        db_session: Optional[Session] = None
+        db_session: Optional[Session] = None,
+        misspecification: Optional[str] = None,  # None, "hidden_style", "nonlinear_interactions", "high_funnel_conversion"
+        withhold_new_products: bool = True
     ):
         self.difficulty = difficulty.lower()
         self.sigma = DIFFICULTY_SIGMA.get(self.difficulty, 0.40)
@@ -120,6 +122,8 @@ class EnvironmentV2:
         self.horizon = horizon
         self.seed = seed
         self.rng = np.random.default_rng(seed)
+        self.misspecification = misspecification
+        self.withhold_new_products = withhold_new_products
 
         # Initialize User Manager
         self.user_manager = UserManager(
@@ -180,14 +184,21 @@ class EnvironmentV2:
             if len(sorted_pids) >= 2:
                 cold_start_pids.update(sorted_pids[-2:])
         self.cold_start_pids = cold_start_pids
-        self.initial_pids = [p["id"] for p in self.products if p["id"] not in self.cold_start_pids]
         self.all_pids = [p["id"] for p in self.products]
-
-        # Boolean mask of available items
-        self.initial_mask = np.array([p["id"] not in self.cold_start_pids for p in self.products], dtype=bool)
+        if self.withhold_new_products:
+            self.initial_pids = [p["id"] for p in self.products if p["id"] not in self.cold_start_pids]
+            self.initial_mask = np.array([p["id"] not in self.cold_start_pids for p in self.products], dtype=bool)
+        else:
+            self.initial_pids = list(self.all_pids)
+            self.initial_mask = np.ones(self.n_products, dtype=bool)
 
         # Precompute static feature components for all 262 products
         self._precompute_static_features()
+
+        # Latent product style embeddings (3D unit vector for hidden style factor)
+        rng_style = np.random.default_rng(999)
+        raw_styles = rng_style.normal(0.0, 1.0, size=(self.n_products, 3))
+        self.product_styles = raw_styles / np.linalg.norm(raw_styles, axis=1, keepdims=True)
 
         # Calibration weights for latent logit utility
         self.w_cat = 2.2
@@ -195,7 +206,25 @@ class EnvironmentV2:
         self.w_rating = 0.6
         self.w_price = 1.0
         self.w_disc = 0.5
-        self.theta_click = 5.72
+        self.beta_click = 5.72  # Renamed from theta_click to avoid clashing with LinUCB theta
+
+        # Precomputed popularity rankings and category lookups for high-speed pipeline candidate retrieval
+        self.sorted_pids_initial = sorted(
+            self.initial_pids,
+            key=lambda pid: (-self.products[self.pid_to_index[pid]]["popularity_score"], pid)
+        )
+        self.sorted_pids_all = sorted(
+            self.all_pids,
+            key=lambda pid: (-self.products[self.pid_to_index[pid]]["popularity_score"], pid)
+        )
+        self.pids_by_cat_initial = {
+            cat: [pid for pid in self.sorted_pids_initial if self.products[self.pid_to_index[pid]]["category"] == cat]
+            for cat in CATEGORIES
+        }
+        self.pids_by_cat_all = {
+            cat: [pid for pid in self.sorted_pids_all if self.products[self.pid_to_index[pid]]["category"] == cat]
+            for cat in CATEGORIES
+        }
 
     def _precompute_static_features(self):
         """Precompute static feature matrix (N, 36) for columns 12..30 and 33..35."""
@@ -357,8 +386,18 @@ class EnvironmentV2:
             - self.w_price * price_penalties
             + self.w_disc * disc_incentives
             + repeat_bonuses
-            - self.theta_click
+            - self.beta_click
         )
+
+        if self.misspecification == "hidden_style":
+            style_utility = 1.2 * np.dot(self.product_styles, user.latent_style)
+            logits += style_utility
+        elif self.misspecification == "nonlinear_interactions":
+            cat_price_interact = np.zeros(self.n_products, dtype=np.float64)
+            cat_price_interact[self.prod_cats == 0] = 0.8 * self.prod_prices[self.prod_cats == 0] / 30000.0
+            cat_price_interact[self.prod_cats == 5] = -0.8 * self.prod_prices[self.prod_cats == 5] / 1000.0
+            synergy = ((self.prod_ratings >= 0.8) & (self.prod_discounts >= 0.4)).astype(np.float64) * 0.9
+            logits += cat_price_interact + synergy
 
         if with_noise:
             logits += self.rng.normal(0.0, self.sigma, size=self.n_products)
@@ -384,11 +423,14 @@ class EnvironmentV2:
         excess = np.maximum(0.0, self.prod_prices - budget) / budget
         in_budget = (self.prod_prices <= budget).astype(np.float64)
 
+        base_p_cart = 0.080 if self.misspecification == "high_funnel_conversion" else BASE_P_CART_GIVEN_CLICK
+        base_p_tx = 0.650 if self.misspecification == "high_funnel_conversion" else BASE_P_TX_GIVEN_CART
+
         cart_mods = np.clip(0.5 + 0.5 * cat_affs + 0.3 * in_budget - 0.3 * excess, 0.5, 2.0)
-        p_carts = BASE_P_CART_GIVEN_CLICK * cart_mods
+        p_carts = base_p_cart * cart_mods
 
         tx_mods = np.clip(0.6 + 0.4 * self.prod_ratings + 0.2 * self.prod_discounts, 0.6, 1.5)
-        p_txs = BASE_P_TX_GIVEN_CART * tx_mods
+        p_txs = base_p_tx * tx_mods
 
         # Expected reward values
         e_tx = REWARD_CONFIG["purchase"] + P_RETURN_GIVEN_TX * REWARD_CONFIG["return"]  # 10 - 0.28 = 9.72
@@ -464,7 +506,11 @@ class EnvironmentV2:
         e_r_policy = float(np.sum(POSITION_BIAS[:len(policy_vals)] * policy_vals))
 
         # Expected regret is strictly >= 0 (identically 0 for Oracle)
-        expected_regret = max(0.0, e_r_oracle - e_r_policy)
+        if policy_slate[:10] == oracle_slate[:10]:
+            expected_regret = 0.0
+            e_r_policy = e_r_oracle
+        else:
+            expected_regret = max(0.0, e_r_oracle - e_r_policy)
 
         # Feature matrix for the displayed slate
         if cached_features is not None:
@@ -510,7 +556,8 @@ class EnvironmentV2:
             excess = max(0.0, (p["price"] - budget) / budget)
             in_budget = 1.0 if p["price"] <= budget else 0.0
             cart_mod = np.clip(0.5 + 0.5 * cat_aff + 0.3 * in_budget - 0.3 * excess, 0.5, 2.0)
-            p_cart = BASE_P_CART_GIVEN_CLICK * cart_mod
+            base_p_cart = 0.080 if self.misspecification == "high_funnel_conversion" else BASE_P_CART_GIVEN_CLICK
+            p_cart = base_p_cart * cart_mod
 
             if self.rng.random() < p_cart:
                 # Add to cart!
@@ -522,7 +569,8 @@ class EnvironmentV2:
 
                 # 4. Transaction decision
                 tx_mod = np.clip(0.6 + 0.4 * self.prod_ratings[p_idx] + 0.2 * self.prod_discounts[p_idx], 0.6, 1.5)
-                p_tx = BASE_P_TX_GIVEN_CART * tx_mod
+                base_p_tx = 0.650 if self.misspecification == "high_funnel_conversion" else BASE_P_TX_GIVEN_CART
+                p_tx = base_p_tx * tx_mod
 
                 if self.rng.random() < p_tx:
                     # Purchase!
@@ -576,3 +624,81 @@ class EnvironmentV2:
             disliked_pids=disliked_pids,
             feature_matrix=feature_matrix
         )
+
+    @classmethod
+    def get_calibration_metrics(
+        cls,
+        difficulty: str = "medium",
+        n_rounds: int = 2500,
+        seed: int = 42
+    ) -> Dict[str, Any]:
+        """
+        Computes empirical funnel calibration rates and reward composition for a given difficulty level.
+        """
+        env_r = cls(difficulty=difficulty, seed=seed)
+        env_o = cls(difficulty=difficulty, seed=seed)
+
+        r_slates_clicked = 0
+        o_slates_clicked = 0
+        total_clicks = 0
+        total_carts = 0
+        total_purchases = 0
+
+        event_counts = {
+            "click": 0,
+            "cart_add": 0,
+            "purchase": 0,
+            "wishlist": 0,
+            "dislike": 0,
+            "cart_remove": 0,
+            "return": 0
+        }
+
+        for t in range(n_rounds):
+            user = env_r.user_manager.sample_active_user(t)
+            av_pids = env_r.get_available_product_ids(t)
+
+            # Oracle slate
+            o_slate, _ = env_o.get_oracle_slate(user, av_pids, t, k=10)
+            fb_o = env_o.step(t, o_slate, user=user)
+            if len(fb_o.clicked_pids) > 0:
+                o_slates_clicked += 1
+
+            # Random slate
+            r_slate = list(env_r.rng.choice(av_pids, size=10, replace=False))
+            fb_r = env_r.step(t, r_slate, user=user)
+            if len(fb_r.clicked_pids) > 0:
+                r_slates_clicked += 1
+
+            total_clicks += len(fb_r.clicked_pids)
+            total_carts += len(fb_r.cart_pids)
+            total_purchases += len(fb_r.purchased_pids)
+
+            for ev in fb_r.events:
+                if ev["event_type"] in event_counts:
+                    event_counts[ev["event_type"]] += 1
+
+        sigma = DIFFICULTY_SIGMA.get(difficulty.lower(), 0.40)
+        random_ctr = float(r_slates_clicked / n_rounds)
+        oracle_ctr = float(o_slates_clicked / n_rounds)
+        cart_rate = float(total_carts / max(1, total_clicks))
+        conversion_rate = float(total_purchases / max(1, total_carts))
+
+        # Reward composition (share of absolute reward points generated)
+        reward_points = {
+            k: float(event_counts[k] * abs(REWARD_CONFIG[k]))
+            for k in event_counts
+        }
+        total_reward_pts = max(1.0, sum(reward_points.values()))
+        reward_comp = {k: float(v / total_reward_pts) for k, v in reward_points.items()}
+
+        return {
+            "difficulty": difficulty.lower(),
+            "sigma": sigma,
+            "random_slate_ctr": random_ctr,
+            "oracle_slate_ctr": oracle_ctr,
+            "cart_rate": cart_rate,
+            "conversion_rate": conversion_rate,
+            "event_counts": event_counts,
+            "reward_composition": reward_comp
+        }

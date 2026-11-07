@@ -162,6 +162,10 @@ class UserInstance:
         self.novelty_preference = float(np.clip(persona["novelty_preference"] + rng.normal(0.0, 0.05), 0.05, 1.0))
         self.preferred_brands = set(persona["preferred_brands"])
 
+        # Latent style preference (3D unit vector for hidden style factor)
+        style_raw = rng.normal(0.0, 1.0, size=3)
+        self.latent_style = style_raw / max(1e-8, float(np.linalg.norm(style_raw)))
+
         # Dynamic state
         self.history: List[Tuple[int, int, str]] = []  # (product_id, round, event_type)
         self.cart: Set[int] = set()
@@ -190,6 +194,10 @@ class UserInstance:
 
         # Interpolate budget
         self.budget = w_orig * self.budget + w_new * (drifted_archetype["budget_mean"])
+
+        # Invert/shift style preferences under full drift
+        if drift_ratio >= 1.0:
+            self.latent_style = -self.latent_style
 
 
 class UserManager:
@@ -249,10 +257,10 @@ class UserManager:
             user = self.users[uid]
 
         # Apply drift if scenario requires
-        if self.drift_mode == "abrupt":
+        if self.drift_mode in ("abrupt", "abrupt_drift"):
             if current_round >= self.drift_round:
                 user.apply_drift(1.0, self.drifted_archetypes[user.persona_id])
-        elif self.drift_mode == "gradual":
+        elif self.drift_mode in ("gradual", "gradual_drift"):
             # Drift gradually between round 5000 and 15000
             start_drift = self.drift_round // 2
             end_drift = self.drift_round + (self.drift_round // 2)
@@ -263,3 +271,4 @@ class UserManager:
         user.total_sessions += 1
         user.last_round_seen = current_round
         return user
+

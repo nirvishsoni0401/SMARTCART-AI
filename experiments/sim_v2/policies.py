@@ -602,8 +602,9 @@ class DiscountedLinUCBPolicy(BasePolicy):
     Discounted LinUCB with exponential decay gamma in (0, 1] for adapting to drift.
     """
 
-    def __init__(self, alpha: float = 0.5, gamma: float = 0.9995, lambda_reg: float = 1.0, feature_dim: int = 36):
-        super().__init__("Discounted LinUCB")
+    def __init__(self, alpha: float = 0.25, gamma: float = 0.9995, lambda_reg: float = 1.0, feature_dim: int = 36, name: Optional[str] = None):
+        policy_name = name or f"Discounted LinUCB (gamma={gamma})"
+        super().__init__(policy_name)
         self.alpha = float(alpha)
         self.gamma = float(gamma)
         self.lambda_reg = float(lambda_reg)
@@ -647,18 +648,13 @@ class DiscountedLinUCBPolicy(BasePolicy):
 
     def update(self, feedback: SlateFeedback) -> None:
         reward_map = {ev["pid"]: ev["reward"] for ev in feedback.events}
-        gamma = self.gamma
-        reg_decay = (1.0 - gamma) * self.lambda_reg * np.eye(self.feature_dim)
+        Phi = feedback.feature_matrix[:len(feedback.slate_pids)]
+        r_vec = np.array([reward_map.get(pid, 0.0) for pid in feedback.slate_pids], dtype=np.float64)
 
-        for pos, pid in enumerate(feedback.slate_pids):
-            phi = feedback.feature_matrix[pos]
-            r = reward_map.get(pid, 0.0)
+        self.A = self.gamma * self.A + (1.0 - self.gamma) * self.lambda_reg * np.eye(self.feature_dim) + (Phi.T @ Phi)
+        self.b = self.gamma * self.b + (Phi.T @ r_vec)
+        self.n_updates += len(feedback.slate_pids)
 
-            self.A = gamma * self.A + reg_decay + np.outer(phi, phi)
-            self.b = gamma * self.b + r * phi
-            self.n_updates += 1
-
-        # Recompute inverse regularly
         try:
             self.A_inv = np.linalg.inv(self.A)
         except np.linalg.LinAlgError:
@@ -682,9 +678,10 @@ class OraclePolicy(BasePolicy):
         available_pids: List[int],
         round_idx: int,
         k: int = 10,
-        feature_matrix: Optional[np.ndarray] = None
+        feature_matrix: Optional[np.ndarray] = None,
+        expected_values: Optional[np.ndarray] = None
     ) -> List[int]:
-        oracle_slate, _ = env.get_oracle_slate(user, available_pids, round_idx, k=k)
+        oracle_slate, _ = env.get_oracle_slate(user, available_pids, round_idx, k=k, expected_values=expected_values)
         return oracle_slate
 
 
@@ -712,35 +709,27 @@ class ProductionPipelineWrapper(BasePolicy):
         user_context: UserContext,
         available_pids: List[int]
     ) -> List[int]:
-        avail_set = set(available_pids)
+        is_all = (len(available_pids) == env.n_products)
+        sorted_pop = env.sorted_pids_all if is_all else env.sorted_pids_initial
+        pids_by_cat = env.pids_by_cat_all if is_all else env.pids_by_cat_initial
 
-        # 1. Top 25 by Popularity
-        sorted_pop = sorted(
-            available_pids,
-            key=lambda pid: (-env.products[env.pid_to_index[pid]]["popularity_score"], pid)
-        )
         pop_candidates = sorted_pop[:25]
         candidate_set = set(pop_candidates)
+        candidates = list(pop_candidates)
 
-        # 2. Top 25 by User Affinity / Category Match
-        # Find user's top categories
+        # 2. Top 25 by User Affinity
         aff_cats = sorted(user_context.category_affinities.items(), key=lambda x: -x[1])
-        cat_candidates = []
         for cat, _ in aff_cats:
-            cat_pids = [
-                pid for pid in available_pids
-                if env.products[env.pid_to_index[pid]]["category"] == cat and pid not in candidate_set
-            ]
-            # Sort within category by popularity
-            cat_pids.sort(key=lambda pid: -env.products[env.pid_to_index[pid]]["popularity_score"])
-            cat_candidates.extend(cat_pids[:10])
-            if len(cat_candidates) >= 25:
+            for pid in pids_by_cat.get(cat, []):
+                if pid not in candidate_set:
+                    candidates.append(pid)
+                    candidate_set.add(pid)
+                    if len(candidates) >= self.candidate_pool_size:
+                        break
+            if len(candidates) >= self.candidate_pool_size:
                 break
 
-        candidates = pop_candidates + cat_candidates[:25]
-        candidate_set.update(cat_candidates[:25])
-
-        # If pool size < 50, fill from remainder of popularity
+        # Fill remainder from popularity if needed
         if len(candidates) < self.candidate_pool_size:
             for pid in sorted_pop:
                 if pid not in candidate_set:
@@ -776,6 +765,14 @@ class ProductionPipelineWrapper(BasePolicy):
 
         if swap_candidate is not None:
             slate[-1] = swap_candidate
+        else:
+            # Fallback across all catalog categories
+            for cat, pids in env.pids_by_cat_all.items():
+                if cat != existing_cat and pids:
+                    for p in pids:
+                        if p not in slate:
+                            slate[-1] = p
+                            return slate
 
         return slate
 

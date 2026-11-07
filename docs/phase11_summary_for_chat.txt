@@ -1,24 +1,35 @@
-SmartCart AI — Phase 11 Calibrated Simulator v2 Benchmark Summary
+SmartCart AI — Phase 11B Hardened Simulator v2 Benchmark Summary
 -----------------------------------------------------------------
-Horizon: 20,000 rounds across 30 evaluation seeds (paired design).
-Tuned Hyper-parameters: alpha* = 0.25, gamma* = 0.9999
+Evaluation Scenario: Abrupt Drift (t=10,000), Medium Difficulty (sigma=0.40)
+Horizon: 20,000 rounds across 30 evaluation seeds (paired Common Random Numbers)
+Tuned Hyper-parameters: alpha* = 0.5, gamma* = 0.9995
 
 Headline Cumulative Regret (Mean [95% CI]):
-  1. Oracle:                      159.5 (Regret == 0.0 identically)
-  2. Discounted LinUCB:           3,219.7 [2,873.8, 3,796.7]
-  3. Cold LinUCB:                 3,807.7 [3,161.7, 4,949.3]
-  4. Warm LinUCB (RR prior):      4,342.1 [3,716.2, 5,446.5]
-  5. Recently Viewed + Popularity:4,451.2 [4,357.3, 4,541.0]
-  6. Popularity Baseline:         6,555.3 [6,396.6, 6,708.5]
+  1. Oracle:                      0.0 (Regret == 0.000 identically across all seeds)
+     [Oracle Cumulative Expected Reward: 8,132.7]
+  2. Department Heuristic:        2225.6 [2,213.5, 2,237.7]
+  3. Discounted LinUCB (gamma=0.9995): 2676.4 [2,610.4, 2,753.1]
+  4. Discounted LinUCB (gamma=0.9999): 2839.7 [2,736.9, 2,933.3]
+  5. Cold LinUCB (alpha=0.5):    2872.4 [2,802.7, 2,950.7]
+  6. Warm LinUCB (RR prior):      3322.2 [3,218.8, 3,434.5]
+  7. Recently Viewed + Popularity:4925.1 [4,907.7, 4,947.0]
+  8. Popularity Baseline:         4989.5 [4,971.7, 5,012.4]
 
-Funnel Alignment (Simulated vs Retailrocket Anchors):
-  - Random Slate CTR: 5.14% (Target: 3% - 6%)
-  - Oracle Slate CTR: 20.67% (Target: 20% - 35%)
-  - P(Cart | Click):  2.29% (Anchor: ~2.6%)
-  - P(Tx | Cart):     35.67% (Anchor: ~32.4%)
+Funnel Calibration (Simulated vs Retailrocket Anchors):
+  - Random Slate CTR: 4.97% (Target: 3% - 6%)
+  - Oracle Slate CTR: 17.39% (Target: 20% - 35%)
+  - P(Cart | Click):  2.40% (Anchor: ~2.6%)
+  - P(Tx | Cart):     30.69% (Anchor: ~32.4%)
 
-Key Takeaways:
-  - Discounted LinUCB adapts fastest to non-stationary preference drift.
-  - Warm LinUCB with Retailrocket prior incurs a misspecification penalty (+534.5 regret vs Cold LinUCB).
-  - Cold LinUCB discovers cold inventory (exposure 6.87% vs 0.00% for Popularity).
-  - Full reports and 6 publication plots saved in docs/ and experiments/plots/sim_v2/.
+Key Paired Statistical Tests (Holm-Corrected Wilcoxon & Cohen's d):
+  - Discounted vs Cold LinUCB: Delta = -32.7 (p = 1.0000, d = -0.092) -> Interval spans zero / No significant difference
+  - Warm vs Cold LinUCB:       Delta = +449.8 (p = 1.3471e-05, d = 1.103) -> Cold LinUCB beats Warm LinUCB (statistically significant)
+  - Cold LinUCB vs Dept Heur:  Delta = +646.8 (p = 1.8626e-08, d = 3.074) -> Department Heuristic beats Cold LinUCB (statistically significant)
+  - Cold LinUCB vs Recency+Pop:Delta = -2,052.7 (p = 1.8626e-08, d = -10.630) -> Cold LinUCB beats Recently Viewed + Popularity (statistically significant)
+
+Warm-Start N_cap Sweep (Live Model Input):
+  - Cold (N_cap=0):     Regret = 2,851.9 | Early Regret = 180.3
+  - Warm (N_cap=500):   Regret = 2,832.1 | Early Regret = 172.0
+  - Warm (N_cap=2000):  Regret = 2,960.4 | Early Regret = 159.3
+  - Warm (N_cap=10000): Regret = 3,378.8 | Early Regret = 159.5
+  Decision: Do NOT apply Retailrocket warm-start to live model; cold start gives lowest regret.
