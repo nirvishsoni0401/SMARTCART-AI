@@ -11,10 +11,10 @@
 ## 1. Environment & Persona Architecture
 - **Catalog Ground Truth**: 262 active products across 6 departments (Beauty: 13, Books: 105, Electronics: 38, Fashion: 49, Home & Kitchen: 40, Sports: 17).
 - **User Population**:
-  - Initial active pool: 150 users.
-  - New arrival probability: 25% per round ($p_{\text{new}} = 0.25$).
+  - Initial active pool: 150 users, expanding to 1,000 unique synthetic users across 20,000 rounds.
+  - User arrival process: Poisson-distributed sessions with mean 5.0 sessions per active customer.
   - Returning shoppers: 75% sampled from active pool according to power-law engagement.
-  - History persistence: Full lifetime history of clicks, carts, purchases, and wishlists preserved across sessions.
+  - History persistence: FIFO session buffer (capacity 20) with lifetime preservation of clicks, carts, purchases, and wishlists.
 - **Latent Personas (10 Archetypes)**:
   1. *Tech Gadgeteer*: Heavy Electronics affinity (0.75), Apple/Samsung/Sony, ₹38,000 budget.
   2. *Fashion Trendsetter*: Heavy Fashion affinity (0.80), luxury brands, ₹45,000 budget, high discount sensitivity.
@@ -30,7 +30,7 @@
 ---
 
 ## 2. Slate Presentation & Examination Bias
-- **Slate Size**: $K = 10$ items presented simultaneously.
+- **Slate Size**: $K = 10$ items presented simultaneously without replacement.
 - **Position Examination Model**:
   $$\gamma_k = \frac{1}{\log_2(k + 2)} \quad \text{for } k \in \{0, \dots, 9\}$$
   Strictly monotonic: $\gamma_0 = 1.000 > \gamma_1 = 0.631 > \dots > \gamma_9 = 0.289$.
@@ -41,41 +41,61 @@
 - **Utility Formulation**:
   $$u(u, i) = w_{\text{cat}} \text{aff}_{\text{cat}} + w_{\text{brand}} \mathbb{I}_{\text{brand}} + w_{\text{rating}} r_i - w_{\text{price}} \text{excess}_i + w_{\text{disc}} d_i + \text{bonus}_{\text{rep}} - \beta_{\text{click}} + \epsilon$$
   where $\beta_{\text{click}} = 5.72$ is the baseline logit threshold (renamed from $\theta$ to prevent notation clash with LinUCB), and $\epsilon \sim \mathcal{N}(0, \sigma^2)$.
+- **Utility Parameter Weights**:
+  - $w_{\text{cat}} = 2.4$ (Category affinity dominates decision-making)
+  - $w_{\text{brand}} = 0.8$ (Brand affinity match)
+  - $w_{\text{price}} = 0.7$ (Budget excess penalty)
+  - $w_{\text{rating}} = 0.5$ (Catalog rating fit)
+  - $w_{\text{disc}} = 0.4$ (Discount sensitivity)
 - **Repeat Engagement Bonus**:
   $$\text{bonus}_{\text{rep}} = 0.75 \cdot \exp(-0.0005 \Delta t)$$
-  added for products previously viewed by the shopper.
+  accumulates specifically on items previously presented to and engaged with by the user.
 - **Funnel Stage Multipliers**:
   - $P(\text{cart} \mid \text{click}) = 2.6\% \times \text{clip}(0.5 + 0.5 \cdot \text{aff}_{\text{cat}} + 0.3 \cdot \mathbb{I}_{\text{in-budget}} - 0.3 \cdot \text{excess}, 0.5, 2.0)$
   - $P(\text{tx} \mid \text{cart}) = 32.4\% \times \text{clip}(0.6 + 0.4 \cdot r_i + 0.2 \cdot d_i, 0.6, 1.5)$
-- **Non-Cart Events**:
-  - Wishlist: $6.0\%$ ($R = +3$)
-  - Dislike: $4.0\%$ ($R = -5$)
-  - Cart Removal (unpurchased): $5.0\%$ ($R = -2$)
-  - Delayed Return (purchased): $3.5\%$ ($R = -8$)
+- **Non-Cart Events & Reward Values**:
+  - Purchase: $+10$ points
+  - Cart Add: $+5$ points
+  - Wishlist ($p = 1.5\%$): $+3$ points
+  - Click: $+2$ points
+  - Dislike ($p = 1.0\%$): $-5$ points
+  - Cart Removal ($p = 5.0\%$): $-2$ points
+  - Delayed Return ($p = 3.0\%$): $-8$ points
+  - Skip: $0$ points
 
 ---
 
 ## 4. Calibration Parameters & Difficulty Noise Scales
 
-| Difficulty | Noise $\sigma$ | Random Slate CTR (%) | Oracle Slate CTR (%) | $P(\text{cart} \mid \text{click})$ (%) | $P(\text{tx} \mid \text{cart})$ (%) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Easy** | 0.15 | 5.23% | 19.93% | 0.63% | 0.00% |
-| **Medium** | 0.40 | 5.43% | 22.00% | 1.21% | 0.00% |
-| **Hard** | 0.80 | 6.97% | 25.87% | 1.85% | 0.00% |
+| Difficulty | Noise $\sigma$ | Random Slate CTR (%) | Oracle Slate CTR (%) | $P(\text{cart} \mid \text{click})$ (%) | $P(\text{tx} \mid \text{cart})$ (%) | Observed Purchases |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Easy** | 0.15 | 5.47% | 20.08% | 2.66% | 43.33% | 13 |
+| **Medium** | 0.40 | 5.42% | 21.43% | 2.43% | 34.48% | 10 |
+| **Hard** | 0.80 | 7.05% | 25.75% | 2.47% | 27.03% | 10 |
+
+### Jensen's Inequality Convexity Effect:
+On negative logit ranges (where $\beta_{\text{click}} = 5.72$ places latent utility in the negative domain), the sigmoid activation $\sigma(x) = 1 / (1 + e^{-x})$ is strictly convex. By Jensen's inequality:
+$$\mathbb{E}[\sigma(X + \epsilon)] > \sigma(\mathbb{E}[X])$$
+Consequently, higher Gaussian logit noise ($\sigma = 0.80$ at Hard) elevates empirical click probability (7.05%) compared to low noise ($\sigma = 0.15$ at Easy: 5.47%). This convexity asymmetry is a natural mathematical feature of logistic choice models under additive Gaussian noise.
 
 ### Empirical Reward Composition (% of absolute points generated):
-- **Medium Difficulty**: Click: 79.9%, Cart Add: 2.4%, Purchase: 0.0%, Wishlist: 8.0%, Dislike: 9.7%, Return: 0.0%, Cart Remove: 0.0%.
+- **Easy Difficulty**: Click: 75.8%, Cart: 5.0%, Purchase: 4.4%, Wishlist: 6.7%, Dislike: 8.1%, Return: 0.0%, Cart Remove: 0.0%.
+- **Medium Difficulty**: Click: 76.4%, Cart: 4.6%, Purchase: 3.2%, Wishlist: 7.5%, Dislike: 8.3%, Return: 0.0%, Cart Remove: 0.0%.
+- **Hard Difficulty**: Click: 78.1%, Cart: 4.8%, Purchase: 2.6%, Wishlist: 6.1%, Dislike: 8.1%, Return: 0.2%, Cart Remove: 0.1%.
 
 ---
 
 ## 5. Model Misspecification Variants & Realisability
 The benchmark tests 3 deliberate violations of LinUCB's 36-dimensional linear assumption:
-1. **Hidden Style Factor**: Unobserved 3-dimensional latent style embedding ($w_{\text{style}} = 1.2$) interacting with user style preference; absent from $\phi(u, i)$.
+1. **Hidden Style Factor**: Unobserved 3-dimensional latent style embedding ($w_{\text{style}} = 1.2$) interacting with user style preference; absent from feature vector $\phi(u, i)$.
 2. **Nonlinear Interactions**: Price $\times$ category sensitivity offsets and rating $\times$ discount synergies.
 3. **High Funnel Conversion**: Base $P(\text{cart} \mid \text{click}) = 8.0\%$ and $P(\text{tx} \mid \text{cart}) = 65.0\%$, making downstream conversion dominate click feedback.
 
 ---
 
-## 6. Oracle Regret Resolution
-In Phase 11, the sequential execution loop shared the mutable `UserInstance` object across all policies within round $t$. By the time `OraclePolicy` selected its slate, earlier policies had mutated `user.history` with fresh click events, causing `get_oracle_slate()` (invoked without cached expected values) to select items against updated repeat bonuses, while `env.step()` evaluated regret against pre-round cached expected values. This subtle state drift accumulated to 159.5 regret over 20,000 rounds.
-In Phase 11B, each policy's trajectory is strictly isolated with its own environment under Common Random Numbers, ensuring the Oracle slate identically matches the argmax expected item values at every round, making Oracle cumulative regret strictly and provably **0.000** across all rounds and seeds.
+## 6. Mathematical Identities & Trajectory Oracle
+For any policy $\pi$, step regret is defined as the gap between the optimal oracle slate reward along policy $\pi$'s own trace and the expected reward of the served slate:
+$$\text{step\_regret}_t = R^*(u_t, t) - R(u_t, a_t)$$
+Summing over all $T$ rounds yields the exact mathematical identity:
+$$\text{Cumulative Reward}(\pi) + \text{Cumulative Regret}(\pi) \equiv R^*_{\text{trajectory}}(\pi) = \sum_{t=1}^T R^*(u_t, t)$$
+Because user repeat bonuses accumulate specifically along the active items served, policies serving higher-utility items build greater repeat affinity, raising the trajectory oracle ceiling ($R^*_{\text{trajectory}} = 8,132.7$ for Oracle, $\sim 7,875.7$ for Cold LinUCB, and $\sim 7,598.1$ for Popularity).

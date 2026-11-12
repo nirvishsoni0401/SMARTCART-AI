@@ -629,7 +629,7 @@ class EnvironmentV2:
     def get_calibration_metrics(
         cls,
         difficulty: str = "medium",
-        n_rounds: int = 2500,
+        n_rounds: int = 4000,
         seed: int = 42
     ) -> Dict[str, Any]:
         """
@@ -670,13 +670,14 @@ class EnvironmentV2:
             if len(fb_r.clicked_pids) > 0:
                 r_slates_clicked += 1
 
-            total_clicks += len(fb_r.clicked_pids)
-            total_carts += len(fb_r.cart_pids)
-            total_purchases += len(fb_r.purchased_pids)
+            total_clicks += len(fb_o.clicked_pids) + len(fb_r.clicked_pids)
+            total_carts += len(fb_o.cart_pids) + len(fb_r.cart_pids)
+            total_purchases += len(fb_o.purchased_pids) + len(fb_r.purchased_pids)
 
-            for ev in fb_r.events:
-                if ev["event_type"] in event_counts:
-                    event_counts[ev["event_type"]] += 1
+            for fb in (fb_o, fb_r):
+                for ev in fb.events:
+                    if ev["event_type"] in event_counts:
+                        event_counts[ev["event_type"]] += 1
 
         sigma = DIFFICULTY_SIGMA.get(difficulty.lower(), 0.40)
         random_ctr = float(r_slates_clicked / n_rounds)

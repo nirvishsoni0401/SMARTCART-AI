@@ -107,10 +107,13 @@ class DepartmentHeuristicPolicy(BasePolicy):
     """
     Ranks items based on the visitor's most recently viewed department (tau < t),
     falling back to user's highest affinity department, with deterministic tie-breaking.
+    If enforce_diversity is True, enforces that at least 2 distinct categories are represented in the top-k slate.
     """
 
-    def __init__(self):
-        super().__init__("Department Heuristic")
+    def __init__(self, enforce_diversity: bool = False, name: Optional[str] = None):
+        policy_name = name or ("Department Heuristic (With Diversity)" if enforce_diversity else "Department Heuristic")
+        super().__init__(policy_name)
+        self.enforce_diversity = enforce_diversity
 
     def select_slate(
         self,
@@ -143,7 +146,16 @@ class DepartmentHeuristicPolicy(BasePolicy):
 
         # Sort descending by (score, pop, -pid)
         scored_items.sort(key=lambda x: (-x[0], -x[1], x[2]))
-        return [x[2] for x in scored_items[:k]]
+        slate = [x[2] for x in scored_items[:k]]
+
+        if self.enforce_diversity and len(slate) == k:
+            cats = {env.products[env.pid_to_index[pid]]["category"] for pid in slate}
+            if len(cats) < 2:
+                for _, _, pid in scored_items[k:]:
+                    if env.products[env.pid_to_index[pid]]["category"] != target_cat:
+                        slate[-1] = pid
+                        break
+        return slate
 
 
 class RecentlyViewedPopularityPolicy(BasePolicy):
@@ -806,3 +818,138 @@ class ProductionPipelineWrapper(BasePolicy):
 
     def update(self, feedback: SlateFeedback) -> None:
         self.base_policy.update(feedback)
+
+
+class DeptPriorLinUCBPolicy(ColdLinUCBPolicy):
+    """
+    Department-Prior LinUCB:
+    Initializes b with a fixed inductive prior on category and brand affinity features
+    chosen on principle ('users prefer categories and brands they engage with'),
+    with strength tuned on tuning seeds (w=0.5).
+    """
+
+    def __init__(self, alpha: float = 0.5, lambda_reg: float = 1.0, prior_weight: float = 0.5, feature_dim: int = 36):
+        self.prior_weight = float(prior_weight)
+        super().__init__(alpha=alpha, lambda_reg=lambda_reg, feature_dim=feature_dim)
+        self.name = f"Dept-Prior LinUCB (w={prior_weight})"
+        self.reset()
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        super().reset(seed)
+        if hasattr(self, "prior_weight"):
+            self.b[0:6] = self.prior_weight
+            self.b[6] = self.prior_weight * 0.5
+
+
+class SlateMixingPolicy(BasePolicy):
+    """
+    Slate Mixing Hybrid:
+    Presents top k slots from Department Heuristic, and fills remaining 10 - k slots from LinUCB,
+    filtering out duplicate products.
+    """
+
+    def __init__(self, k_heuristic: int = 3, alpha: float = 0.5, base_bandit: Optional[BasePolicy] = None):
+        super().__init__(f"Slate Mixing (k={k_heuristic} Dept + LinUCB)")
+        self.k_heuristic = k_heuristic
+        self.heuristic = DepartmentHeuristicPolicy()
+        self.bandit = base_bandit if base_bandit is not None else ColdLinUCBPolicy(alpha=alpha)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        self.heuristic.reset(seed)
+        self.bandit.reset(seed)
+
+    def select_slate(
+        self,
+        env: EnvironmentV2,
+        user: UserInstance,
+        user_context: UserContext,
+        available_pids: List[int],
+        round_idx: int,
+        k: int = 10,
+        feature_matrix: Optional[np.ndarray] = None
+    ) -> List[int]:
+        h_slate = self.heuristic.select_slate(
+            env=env,
+            user=user,
+            user_context=user_context,
+            available_pids=available_pids,
+            round_idx=round_idx,
+            k=self.k_heuristic,
+            feature_matrix=feature_matrix
+        )
+        seen = set(h_slate)
+        rem_pids = [p for p in available_pids if p not in seen]
+        b_slate = self.bandit.select_slate(
+            env=env,
+            user=user,
+            user_context=user_context,
+            available_pids=rem_pids,
+            round_idx=round_idx,
+            k=k - len(h_slate),
+            feature_matrix=feature_matrix
+        )
+        return h_slate + b_slate
+
+    def update(self, feedback: SlateFeedback) -> None:
+        self.heuristic.update(feedback)
+        self.bandit.update(feedback)
+
+
+class ResidualLinUCBPolicy(ColdLinUCBPolicy):
+    """
+    Residual LinUCB Hybrid:
+    Scores items with a base Department Heuristic offset, while LinUCB learns residual
+    personalization and exploration adjustments.
+    """
+
+    def __init__(self, alpha: float = 0.5, lambda_reg: float = 1.0, scale: float = 0.05, feature_dim: int = 36):
+        super().__init__(alpha=alpha, lambda_reg=lambda_reg, feature_dim=feature_dim)
+        self.name = "Residual LinUCB"
+        self.scale = scale
+
+    def _get_heuristic_offsets(
+        self,
+        env: EnvironmentV2,
+        user: UserInstance,
+        user_context: UserContext,
+        available_pids: List[int]
+    ) -> np.ndarray:
+        target_cat = None
+        if user.history:
+            last_pid = user.history[-1][0]
+            if last_pid in env.pid_to_index:
+                target_cat = env.products[env.pid_to_index[last_pid]]["category"]
+        if not target_cat:
+            target_cat = max(user_context.category_affinities.items(), key=lambda x: x[1])[0]
+
+        offsets = np.zeros(len(available_pids), dtype=np.float64)
+        for i, pid in enumerate(available_pids):
+            p = env.products[env.pid_to_index[pid]]
+            match_boost = 2.0 if p["category"] == target_cat else 0.0
+            offsets[i] = (match_boost + p["popularity_score"] * 0.1) * self.scale
+        return offsets
+
+    def select_slate(
+        self,
+        env: EnvironmentV2,
+        user: UserInstance,
+        user_context: UserContext,
+        available_pids: List[int],
+        round_idx: int,
+        k: int = 10,
+        feature_matrix: Optional[np.ndarray] = None
+    ) -> List[int]:
+        h_offsets = self._get_heuristic_offsets(env, user, user_context, available_pids)
+        theta = self.theta
+        avail_indices = np.array([env.pid_to_index[pid] for pid in available_pids], dtype=np.int32)
+        if feature_matrix is None:
+            feature_matrix = env.build_feature_matrix_for_user(user, user_context)
+
+        X = feature_matrix[avail_indices]
+        mean_rewards = X @ theta
+        variances = np.sum((X @ self.A_inv) * X, axis=1)
+        ucb_scores = mean_rewards + self.alpha * np.sqrt(np.maximum(1e-8, variances))
+        combined_scores = ucb_scores + h_offsets
+
+        top_k_idx = np.argsort(-combined_scores)[:k]
+        return [available_pids[i] for i in top_k_idx]

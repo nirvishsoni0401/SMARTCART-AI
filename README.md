@@ -544,24 +544,26 @@ The Admin Dashboard is accessible at `http://localhost:5173/admin` (requires adm
 3. **Zero Novel Exploration Edge**: On pure novel discovery, Warm LinUCB and Popularity are statistically indistinguishable.
 4. **Repeat Dominance**: In e-commerce click logs, short-term recency accounts for the majority of recommendation hits.
 
-### 9.1 Calibrated Simulator v2 Benchmark Results (Phase 11B)
+### 9.1 Calibrated Simulator v2 Benchmark Results (Phase 12A)
 
 > [!NOTE]
 > **Scope**: Behaviour observed strictly within the calibrated position-biased simulator (`experiments/sim_v2/`).
 > Evaluated over **20,000 rounds** across **30 independent evaluation seeds** (paired Common Random Numbers).
 > Condition: **Abrupt Preference Drift**, **Medium Difficulty** ($\sigma = 0.40$), Full Catalog (262 SKUs).
-> Not causal evidence of production customer behaviour.
+> Not causal evidence of production customer behaviour. All Phase 11 numbers are superseded.
 
-| Policy | Cumulative Regret (Mean [95% CI]) | Cumulative Expected Reward | Slate CTR (%) | Diversity (Cats) | Latency (ms) |
+| Policy | Cumulative Regret (Mean [95% CI]) | Traj. Oracle Reward | Regret Share (%) | Slate CTR (%) | Cumulative Reward |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Oracle** | 0.0 [0.0, 0.0] | 8,132.7 | 17.39% | 1.18 | 0.147 |
-| **Discounted LinUCB** | 2,839.7 [2,736.9, 2,933.3] | 5,026.5 | 11.18% | 2.59 | 0.538 |
-| **Cold LinUCB** | 2,872.4 [2,802.7, 2,950.7] | 5,003.4 | 11.17% | 2.58 | 0.857 |
-| **Warm LinUCB** | 3,322.2 [3,218.8, 3,434.5] | 4,546.2 | 10.14% | 2.79 | 0.869 |
-| **Recently Viewed + Pop** | 4,925.1 [4,907.7, 4,947.0] | 2,671.5 | 6.21% | 1.00 | 0.291 |
-| **Popularity** | 4,989.5 [4,971.7, 5,012.4] | 2,608.7 | 6.07% | 1.00 | 0.257 |
+| **Oracle** | 0.0 [0.0, 0.0] | 8,132.7 | 0.0% | 17.39% | 8,132.7 |
+| **Department Heuristic** | 2,225.6 [2,213.5, 2,237.7] | 7,831.5 | 28.4% | 12.55% | 5,605.9 |
+| **Slate Mixing (k=5)** | 2,585.8 [2,565.3, 2,605.3] | 7,838.1 | 33.0% | 11.83% | 5,252.3 |
+| **Discounted LinUCB (gamma*=0.9995)** | 2,609.0 [2,531.3, 2,690.4] | 7,887.1 | 33.1% | 11.74% | 5,278.1 |
+| **Cold LinUCB (alpha*=0.5)** | 2,943.0 [2,860.0, 3,029.7] | 7,867.7 | 37.4% | 10.98% | 4,924.7 |
+| **Warm LinUCB** | 3,390.8 [3,297.3, 3,481.3] | 7,862.2 | 43.1% | 9.98% | 4,471.4 |
+| **Recently Viewed + Pop** | 4,925.1 [4,907.7, 4,947.0] | 7,596.6 | 64.8% | 6.21% | 2,671.5 |
+| **Popularity** | 4,989.5 [4,971.7, 5,012.4] | 7,598.1 | 65.7% | 6.07% | 2,608.7 |
 
-See [`docs/phase11b-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/phase11b-report.md) and [`docs/sim_assumptions.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/sim_assumptions.md) for complete details.
+See [`docs/phase12a-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/phase12a-report.md) and [`docs/sim_assumptions.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/sim_assumptions.md) for complete details.
 
 ## 10. Assumptions & System Limitations
 

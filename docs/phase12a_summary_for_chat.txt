@@ -1,0 +1,31 @@
+================================================================================
+PHASE 12A SIMULATOR V2 HARDENED BENCHMARK SUMMARY (Single Ground Truth)
+================================================================================
+
+1. PRIMARY HEADLINE BENCHMARK (30 Seeds, Abrupt Drift, Medium Noise sigma=0.40, Horizon 20,000):
+   - Oracle (Exact 0.0 Regret):            Regret = 0.0 [0.0, 0.0] | Traj. Oracle = 8,132.7 | CTR = 17.39% | Reward = 8,132.7
+   - Department Heuristic:                 Regret = 2,225.6 [2,213.5, 2,237.7] | Traj. Oracle = 7,831.5 | Regret Share = 28.4%
+   - Slate Mixing (k=5 Dept + LinUCB):     Regret = 2,585.8 [2,565.3, 2,605.3] | Traj. Oracle = 7,838.1
+   - Discounted LinUCB (gamma*=0.9995):    Regret = 2,609.0 [2,531.3, 2,690.4] | Traj. Oracle = 7,887.1
+   - Slate Mixing (k=3 Dept + LinUCB):     Regret = 2,690.5 [2,653.3, 2,725.4] | Traj. Oracle = 7,859.9
+   - Cold LinUCB (alpha*=0.5):             Regret = 2,943.0 [2,860.0, 3,029.7] | Traj. Oracle = 7,867.7 | Regret Share = 37.4%
+   - Cold LinTS (v=0.25):                  Regret = 2,829.4 [2,770.1, 2,890.9] | Traj. Oracle = 7,880.9
+   - Dept-Prior LinUCB (w=0.5):            Regret = 2,952.3 [2,877.3, 3,028.3]
+   - Warm LinUCB (N_cap=10,000):           Regret = 3,390.8 [3,297.3, 3,481.3]
+   - Residual LinUCB:                      Regret = 3,536.2 [3,470.3, 3,613.5]
+   - Recently Viewed + Popularity:         Regret = 4,925.1 [4,907.7, 4,947.0]
+   - Popularity:                           Regret = 4,989.5 [4,971.7, 5,012.4]
+   - Random:                               Regret = 5,527.8 [5,508.0, 5,548.2]
+
+2. MATHEMATICAL IDENTITY & TRAJECTORY ORACLE RECONCILIATION:
+   - For all policies: Reward(pi) + Regret(pi) == Trajectory Oracle Expected Reward(pi)
+   - Sums vary from 7,598.1 (Popularity) to 8,132.7 (Oracle) because repeat bonus accumulates along active paths.
+
+3. SCIENTIFIC HYBRIDS VERDICT:
+   - NO hybrid beats the pure Department Heuristic!
+   - Reason: Category affinity utility weight w_cat = 2.4 dominates. The heuristic exploits the dominant term without exploration regret.
+
+4. WARM-START & DETERMINISM PARITY:
+   - Warm LinUCB (N_cap=0): Regret = 2,943.0 == Cold LinUCB (2,943.0)
+   - Warm LinTS (N_cap=0):  Regret = 2,829.4 == Cold LinTS (2,829.4)
+================================================================================

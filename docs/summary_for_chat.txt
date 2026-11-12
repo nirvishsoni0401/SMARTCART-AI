@@ -1,4 +1,5 @@
-SMARTCART AI — PHASE 10D MASTER RESULTS SUMMARY
+================================================================================
+SMARTCART AI — PHASE 10D CONSOLIDATED OFFLINE EVALUATION (Single Ground Truth)
 ================================================================================
 AUTHORITATIVE KEY NUMBERS (Auto-generated from offline_master_results.json):
 
@@ -31,38 +32,34 @@ AUTHORITATIVE KEY NUMBERS (Auto-generated from offline_master_results.json):
    - Prequential Catch-Up Step: Step 8349 (Cold rolling HR enters within 1 SE of Warm rolling HR)
 ================================================================================
 
-SmartCart AI — Phase 11B Hardened Simulator v2 Benchmark Summary
------------------------------------------------------------------
-Evaluation Scenario: Abrupt Drift (t=10,000), Medium Difficulty (sigma=0.40)
-Horizon: 20,000 rounds across 30 evaluation seeds (paired Common Random Numbers)
-Tuned Hyper-parameters: alpha* = 0.5, gamma* = 0.9995
+================================================================================
+PHASE 12A SIMULATOR V2 HARDENED BENCHMARK SUMMARY (Single Ground Truth)
+================================================================================
 
-Headline Cumulative Regret (Mean [95% CI]):
-  1. Oracle:                      0.0 (Regret == 0.000 identically across all seeds)
-     [Oracle Cumulative Expected Reward: 8,132.7]
-  2. Department Heuristic:        2225.6 [2,213.5, 2,237.7]
-  3. Discounted LinUCB (gamma=0.9995): 2676.4 [2,610.4, 2,753.1]
-  4. Discounted LinUCB (gamma=0.9999): 2839.7 [2,736.9, 2,933.3]
-  5. Cold LinUCB (alpha=0.5):    2872.4 [2,802.7, 2,950.7]
-  6. Warm LinUCB (RR prior):      3322.2 [3,218.8, 3,434.5]
-  7. Recently Viewed + Popularity:4925.1 [4,907.7, 4,947.0]
-  8. Popularity Baseline:         4989.5 [4,971.7, 5,012.4]
+1. PRIMARY HEADLINE BENCHMARK (30 Seeds, Abrupt Drift, Medium Noise sigma=0.40, Horizon 20,000):
+   - Oracle (Exact 0.0 Regret):            Regret = 0.0 [0.0, 0.0] | Traj. Oracle = 8,132.7 | CTR = 17.39% | Reward = 8,132.7
+   - Department Heuristic:                 Regret = 2,225.6 [2,213.5, 2,237.7] | Traj. Oracle = 7,831.5 | Regret Share = 28.4%
+   - Slate Mixing (k=5 Dept + LinUCB):     Regret = 2,585.8 [2,565.3, 2,605.3] | Traj. Oracle = 7,838.1
+   - Discounted LinUCB (gamma*=0.9995):    Regret = 2,609.0 [2,531.3, 2,690.4] | Traj. Oracle = 7,887.1
+   - Slate Mixing (k=3 Dept + LinUCB):     Regret = 2,690.5 [2,653.3, 2,725.4] | Traj. Oracle = 7,859.9
+   - Cold LinUCB (alpha*=0.5):             Regret = 2,943.0 [2,860.0, 3,029.7] | Traj. Oracle = 7,867.7 | Regret Share = 37.4%
+   - Cold LinTS (v=0.25):                  Regret = 2,829.4 [2,770.1, 2,890.9] | Traj. Oracle = 7,880.9
+   - Dept-Prior LinUCB (w=0.5):            Regret = 2,952.3 [2,877.3, 3,028.3]
+   - Warm LinUCB (N_cap=10,000):           Regret = 3,390.8 [3,297.3, 3,481.3]
+   - Residual LinUCB:                      Regret = 3,536.2 [3,470.3, 3,613.5]
+   - Recently Viewed + Popularity:         Regret = 4,925.1 [4,907.7, 4,947.0]
+   - Popularity:                           Regret = 4,989.5 [4,971.7, 5,012.4]
+   - Random:                               Regret = 5,527.8 [5,508.0, 5,548.2]
 
-Funnel Calibration (Simulated vs Retailrocket Anchors):
-  - Random Slate CTR: 4.97% (Target: 3% - 6%)
-  - Oracle Slate CTR: 17.39% (Target: 20% - 35%)
-  - P(Cart | Click):  2.40% (Anchor: ~2.6%)
-  - P(Tx | Cart):     30.69% (Anchor: ~32.4%)
+2. MATHEMATICAL IDENTITY & TRAJECTORY ORACLE RECONCILIATION:
+   - For all policies: Reward(pi) + Regret(pi) == Trajectory Oracle Expected Reward(pi)
+   - Sums vary from 7,598.1 (Popularity) to 8,132.7 (Oracle) because repeat bonus accumulates along active paths.
 
-Key Paired Statistical Tests (Holm-Corrected Wilcoxon & Cohen's d):
-  - Discounted vs Cold LinUCB: Delta = -32.7 (p = 1.0000, d = -0.092) -> Interval spans zero / No significant difference
-  - Warm vs Cold LinUCB:       Delta = +449.8 (p = 1.3471e-05, d = 1.103) -> Cold LinUCB beats Warm LinUCB (statistically significant)
-  - Cold LinUCB vs Dept Heur:  Delta = +646.8 (p = 1.8626e-08, d = 3.074) -> Department Heuristic beats Cold LinUCB (statistically significant)
-  - Cold LinUCB vs Recency+Pop:Delta = -2,052.7 (p = 1.8626e-08, d = -10.630) -> Cold LinUCB beats Recently Viewed + Popularity (statistically significant)
+3. SCIENTIFIC HYBRIDS VERDICT:
+   - NO hybrid beats the pure Department Heuristic!
+   - Reason: Category affinity utility weight w_cat = 2.4 dominates. The heuristic exploits the dominant term without exploration regret.
 
-Warm-Start N_cap Sweep (Live Model Input):
-  - Cold (N_cap=0):     Regret = 2,851.9 | Early Regret = 180.3
-  - Warm (N_cap=500):   Regret = 2,832.1 | Early Regret = 172.0
-  - Warm (N_cap=2000):  Regret = 2,960.4 | Early Regret = 159.3
-  - Warm (N_cap=10000): Regret = 3,378.8 | Early Regret = 159.5
-  Decision: Do NOT apply Retailrocket warm-start to live model; cold start gives lowest regret.
+4. WARM-START & DETERMINISM PARITY:
+   - Warm LinUCB (N_cap=0): Regret = 2,943.0 == Cold LinUCB (2,943.0)
+   - Warm LinTS (N_cap=0):  Regret = 2,829.4 == Cold LinTS (2,829.4)
+================================================================================
