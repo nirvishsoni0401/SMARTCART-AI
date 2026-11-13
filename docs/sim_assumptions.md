@@ -80,13 +80,14 @@
 1. **Diagnostic vs Headline Horizon Saturation**:
    The diagnostic calibration table above measures pre-drift initial saturation over a short horizon ($T = 4,000$ rounds, seed 42) without preference drift, yielding Medium Oracle CTR of 21.43% and Random CTR of 5.42%.
    In contrast, the headline benchmark is evaluated across the full $T = 20,000$ rounds over 30 independent seeds with preference drift at $t=10,000$, yielding Medium Oracle Slate CTR of 17.39% and Random Slate CTR of 4.97%.
+   Notice that under full benchmark conditions with position decay and preference drift, benchmark Medium Oracle Slate CTR is 17.39%, which is below the initial 20.0% stationary target.
 2. **Sample Sizes Behind Conversion Funnel**:
-   Under medium difficulty calibration, 1193 clicks yielded 29 cart adds ($P(\text{cart} \mid \text{click}) = 2.43\%$), which subsequently converted into 10 purchases ($P(\text{tx} \mid \text{cart}) = 34.48\%$).
+   Under medium difficulty calibration, 1,193 clicks yielded 29 cart adds ($P(\text{cart} \mid \text{click}) = 2.43\%$), which subsequently converted into 10 purchases ($P(\text{tx} \mid \text{cart}) = 34.48\%$).
 3. **Random and Oracle Slate CTR by Environment Variant (30 Evaluation Seeds, Horizon 20,000)**:
    - **Well-Specified Base**: Random CTR = 4.97% | Oracle CTR = 17.39%
    - **Hidden Style Factor**: Random CTR = 6.05% | Oracle CTR = 31.63%
    - **Nonlinear Interactions**: Random CTR = 6.96% | Oracle CTR = 47.84%
-   - **High Funnel Conversion**: Random CTR = 4.98% | Oracle CTR = 17.38%
+   - **High Funnel Conversion**: Random CTR = 4.98% | Oracle CTR = 17.38%.
 
 ### Jensen's Inequality Convexity Effect:
 On negative logit ranges (where $\beta_{\text{click}} = 5.72$ places latent utility in the negative domain), the sigmoid activation $\sigma(x) = 1 / (1 + e^{-x})$ is strictly convex. By Jensen's inequality:

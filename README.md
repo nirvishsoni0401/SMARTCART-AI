@@ -544,21 +544,22 @@ The Admin Dashboard is accessible at `http://localhost:5173/admin` (requires adm
 > **Scope**: Behaviour observed strictly within the calibrated position-biased simulator (`experiments/sim_v2/`).
 > Evaluated over **20,000 rounds** across **30 independent evaluation seeds** (paired Common Random Numbers).
 > Condition: **Abrupt Preference Drift**, **Medium Difficulty** ($\sigma = 0.40$), Full Catalog (262 SKUs).
-> Not causal evidence of production customer behaviour. All Phase 11 and Phase 12A numbers are superseded.
+> Not causal evidence of production customer behaviour. All Phase 11 and Phase 12A numbers are superseded. The parity test covers policy scoring logic with identical inputs, not the live feature extraction pipeline.
 
 | Policy | Cumulative Regret (Mean [95% CI]) | Traj. Oracle Reward | Regret Share (%) | Slate CTR (%) | Cumulative Reward |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Oracle** | 0.0 [0.0, 0.0] | 8,132.7 | 0.0% | 17.39% | 8,132.7 |
-| **Dept-Restricted LinUCB (Cold)** | 1429.6 [1371.8, 1498.0] | 7,970.9 | 17.9% | 14.33% | 6,541.3 |
-| **Dept-Restricted LinUCB (Disc)** | 1438.3 [1398.9, 1481.7] | 7,975.8 | 18.0% | 14.32% | 6,537.5 |
-| **Residual LinUCB** | 1602.1 [1518.0, 1685.3] | 7,935.6 | 20.2% | 13.97% | 6,333.5 |
-| **Department Heuristic** | 2225.6 [2213.5, 2237.7] | 7,831.5 | 28.4% | 12.55% | 5,605.9 |
-| **Slate Mixing (k=5)** | 2631.9 [2610.2, 2653.7] | 7,834.1 | 33.6% | 11.76% | 5,202.2 |
-| **Discounted LinUCB (gamma*=0.9995)** | 2534.6 [2451.1, 2617.8] | 7,905.4 | 32.1% | 11.91% | 5,370.7 |
-| **Cold LinUCB (alpha*=0.5)** | 2942.0 [2858.1, 3031.7] | 7,855.4 | 37.5% | 10.93% | 4,913.4 |
-| **Warm LinUCB** | 3159.7 [3128.0, 3191.2] | 7,887.1 | 40.1% | 10.57% | 4,727.4 |
-| **Recently Viewed + Pop** | 4925.1 [4907.7, 4947.0] | 7,596.6 | 64.8% | 6.21% | 2,671.5 |
-| **Popularity** | 4989.5 [4971.7, 5012.4] | 7,598.1 | 65.7% | 6.07% | 2,608.7 |
+| **Dept-Restricted LinUCB (Cold)** | 1,429.6 [1,371.8, 1,498.0] | 7,970.9 | 17.9% | 14.33% | 6,541.3 |
+| **Dept-Restricted LinUCB (Disc)** | 1,438.3 [1,398.9, 1,481.7] | 7,975.8 | 18.0% | 14.32% | 6,537.5 |
+| **Residual LinUCB** | 1,602.1 [1,518.0, 1,685.3] | 7,935.6 | 20.2% | 13.97% | 6,333.5 |
+| **Department Heuristic** | 2,225.6 [2,213.5, 2,237.7] | 7,831.5 | 28.4% | 12.55% | 5,605.9 |
+| **Slate Mixing (k=5)** | 2,631.9 [2,610.2, 2,653.7] | 7,834.1 | 33.6% | 11.76% | 5,202.2 |
+| **Discounted LinUCB (gamma*=0.9995)** | 2,534.6 [2,451.1, 2,617.8] | 7,905.4 | 32.1% | 11.91% | 5,370.7 |
+| **Cold LinUCB (alpha*=0.5)** | 2,942.0 [2,858.1, 3,031.7] | 7,855.4 | 37.5% | 10.93% | 4,913.4 |
+| **Warm LinUCB** | 3,381.5 [3,339.7, 3,425.6] | 7,875.7 | 42.9% | 10.08% | 4,494.1 |
+| **Recently Viewed + Pop** | 4,925.1 [4,907.7, 4,947.0] | 7,596.6 | 64.8% | 6.21% | 2,671.5 |
+| **Popularity** | 4,989.5 [4,971.7, 5,012.4] | 7,598.1 | 65.7% | 6.07% | 2,608.7 |
+| **Random** | 5,527.8 [5,508.0, 5,548.2] | 7,588.9 | 72.8% | 4.97% | 2,061.1 |
 
 See [`docs/phase12a2-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/phase12a2-report.md) and [`docs/sim_assumptions.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/sim_assumptions.md) for complete details.
 
@@ -588,6 +589,20 @@ See [`docs/phase12a2-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-A
 | **Warm LinTS (v=0.25)** | 11.07% | [10.95%, 11.19%] | 18.21% | [17.98%, 18.44%] |
 | **Hybrid Slate (k=3 RV + 7 LinUCB)** | 13.16% | [13.04%, 13.29%] | 24.41% | [24.16%, 24.68%] |
 | **Hybrid Slate (k=5 RV + 5 LinUCB)** | 13.01% | [12.89%, 13.13%] | 24.67% | [24.41%, 24.95%] |
+
+#### 9.2.2.1 Phase 12C Erratum: Impact of Brand Hashing Fix on Frozen Metrics
+Following the deterministic cryptographic hash audit (`compute_brand_bucket`), offline sufficient statistics were regenerated. A direct recomputation across the 335,612 held-out test events under the frozen Phase 10D protocol confirms that all 4 non-feature baselines are identical to floating precision ($\\Delta = 0.000$ pp), while Warm LinUCB shows minor variations (maximum $\\Delta = 0.372$ pp):
+
+| Slice | Policy | Frozen Metric (Phase 10D) | Regenerated (Post-Fix) | Delta pp |
+| :--- | :--- | :--- | :--- | :--- |
+| **Overall** | Warm LinUCB | Macro: 11.20% [11.08%, 11.32%] | Macro: 10.87% [10.75%, 10.99%] | -0.329 pp |
+| **Overall** | Warm LinUCB | Micro: 18.33% [18.08%, 18.57%] | Micro: 18.20% [17.96%, 18.44%] | -0.123 pp |
+| **Novel** | Warm LinUCB | Macro: 5.82% [5.72%, 5.92%] | Macro: 5.46% [5.37%, 5.56%] | -0.355 pp |
+| **Novel** | Warm LinUCB | Micro: 6.13% [6.04%, 6.22%] | Micro: 5.87% [5.77%, 5.96%] | -0.258 pp |
+| **Repeat** | Warm LinUCB | Macro: 71.36% [70.87%, 71.81%] | Macro: 71.66% [71.17%, 72.12%] | +0.299 pp |
+| **Repeat** | Warm LinUCB | Micro: 63.18% [61.77%, 64.42%] | Micro: 63.55% [62.09%, 64.76%] | +0.372 pp |
+
+On pure novel target items, regenerated Warm LinUCB achieves **5.46%** Macro HR@10, which remains below the simple Popularity baseline (**5.76%** [5.66%, 5.85%]) and Cold LinUCB (**5.60%** [5.51%, 5.70%]). This further reinforces the decision to keep `warm_start: OFF` in live production models.
 
 #### 9.2.3 Novel Target Discovery vs Repeat Intent
 
@@ -657,7 +672,7 @@ See [`docs/phase12a2-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-A
 2. **Proxy Offline Evaluation on Logged Positive Interactions**:
    The Retailrocket offline evaluation is strictly a **proxy evaluation on logged positive-only interactions** (`view`, `addtocart`, `transaction`). Because logging propensities for unchosen items are unknown, unbiased counterfactual Inverse Propensity Scoring (IPS) cannot be computed. Results evaluate offline hit-rate replay under observed interaction paths.
 3. **Warm-Start Status in Live Application**:
-   Retailrocket warm-start snapshots are kept backend-only for research comparison and are **NOT applied to live models (`warm_start: OFF`)**. Live models initialize with cold identity covariances ($A = I_d, b = 0$) and learn exclusively from incoming user events.
+   Retailrocket warm-start snapshots are kept backend-only for research comparison and are **NOT applied to live models (`warm_start: OFF`)**. Reasons: (1) mixed empirical evidence: while a moderate $N_{\text{cap}} = 500$ helps standard LinUCB under preference drift in the simulator, it is untested for the default live two-stage hybrid policy (`Dept-Restricted LinUCB + Expl m=2`); (2) on Retailrocket offline held-out novel targets, Warm LinUCB achieves 5.46% Macro HR@10, which does not exceed the simple Popularity baseline (5.76%) or Cold LinUCB (5.60%). Live models initialize with cold identity covariances ($A = I_d, b = 0$) and learn online exclusively from incoming user events.
 4. **Brand Hashing & Cross-Platform Determinism**:
    Brand features (indices 22–29) utilize deterministic cryptographic hashing (`hashlib.sha256`) modulo 8 rather than Python's process-salted `hash()`. This guarantees identical feature vectors and rankings across independent processes and operating systems regardless of `PYTHONHASHSEED`.
 5. **Database Concurrency & Write Serialization**:

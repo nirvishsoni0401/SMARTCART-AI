@@ -419,7 +419,7 @@ export default function AdminDashboard() {
         </div>
 
         <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-          <strong>Key Trade-Off</strong>: In the well-specified base environment, <strong>Dept-Restricted LinUCB</strong> achieves the lowest regret share (17.9%), decisively outperforming the static <strong>Department Heuristic</strong> (28.4%). However, under nonlinear customer choice interactions, the Department Heuristic collapses to <strong>71.8% regret share</strong>, whereas adaptive bandits like <strong>Discounted LinUCB</strong> (26.6%) and <strong>Cold LinUCB</strong> (30.6%) learn feature synergies and remain highly robust.
+          <strong>Key Trade-Off</strong>: In the well-specified base environment, <strong>Dept-Restricted LinUCB</strong> achieves 17.9% regret share (m=0) and 22.3% (m=2), compared to 28.4% for the static <strong>Department Heuristic</strong>. Under nonlinear customer choice interactions, the Department Heuristic accumulates <strong>71.8% regret share</strong>, whereas adaptive bandits like <strong>Discounted LinUCB</strong> (26.6%), <strong>Cold LinUCB</strong> (30.6%), and <strong>Dept-Restricted LinUCB (m=2)</strong> (47.5%) maintain lower regret shares.
         </p>
 
         <div className="overflow-x-auto">
@@ -436,10 +436,17 @@ export default function AdminDashboard() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
                 <td className="py-2 font-bold text-indigo-600 dark:text-indigo-400">Dept-Restricted LinUCB (m=2)</td>
-                <td className="py-2 text-center font-black text-emerald-600 dark:text-emerald-400">17.9% (Best)</td>
+                <td className="py-2 text-center font-bold">22.3%</td>
+                <td className="py-2 text-center">50.2%</td>
+                <td className="py-2 text-center font-bold text-indigo-600 dark:text-indigo-400">47.5%</td>
+                <td className="py-2 text-center font-bold">22.8%</td>
+              </tr>
+              <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
+                <td className="py-2 font-bold text-indigo-600 dark:text-indigo-400">Dept-Restricted LinUCB (m=0)</td>
+                <td className="py-2 text-center font-black text-emerald-600 dark:text-emerald-400">17.9% (Best Base)</td>
                 <td className="py-2 text-center">48.0%</td>
                 <td className="py-2 text-center">51.6%</td>
-                <td className="py-2 text-center font-bold text-emerald-600 dark:text-emerald-400">18.6%</td>
+                <td className="py-2 text-center font-bold text-emerald-600 dark:text-emerald-400">18.6% (Best Funnel)</td>
               </tr>
               <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
                 <td className="py-2 font-semibold text-slate-900 dark:text-white">Residual LinUCB</td>

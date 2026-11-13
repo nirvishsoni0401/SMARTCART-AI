@@ -347,13 +347,14 @@ def generate_assumption_card(results: Dict[str, Any]):
 1. **Diagnostic vs Headline Horizon Saturation**:
    The diagnostic calibration table above measures pre-drift initial saturation over a short horizon ($T = 4,000$ rounds, seed 42) without preference drift, yielding Medium Oracle CTR of {cal_med['oracle_slate_ctr']*100:.2f}% and Random CTR of {cal_med['random_slate_ctr']*100:.2f}%.
    In contrast, the headline benchmark is evaluated across the full $T = 20,000$ rounds over 30 independent seeds with preference drift at $t=10,000$, yielding Medium Oracle Slate CTR of {primary['Oracle']['slate_ctr']['mean']*100:.2f}% and Random Slate CTR of {primary['Random']['slate_ctr']['mean']*100:.2f}%.
+   Notice that under full benchmark conditions with position decay and preference drift, benchmark Medium Oracle Slate CTR is {primary['Oracle']['slate_ctr']['mean']*100:.2f}%, which is below the initial 20.0% stationary target.
 2. **Sample Sizes Behind Conversion Funnel**:
-   Under medium difficulty calibration, {cal_med['event_counts']['click']} clicks yielded {cal_med['event_counts']['cart_add']} cart adds ($P(\\text{{cart}} \\mid \\text{{click}}) = {cal_med['cart_rate']*100:.2f}\\%$), which subsequently converted into {cal_med['event_counts']['purchase']} purchases ($P(\\text{{tx}} \\mid \\text{{cart}}) = {cal_med['conversion_rate']*100:.2f}\\%$).
+   Under medium difficulty calibration, {cal_med['event_counts']['click']:,} clicks yielded {cal_med['event_counts']['cart_add']} cart adds ($P(\\text{{cart}} \\mid \\text{{click}}) = {cal_med['cart_rate']*100:.2f}\\%$), which subsequently converted into {cal_med['event_counts']['purchase']} purchases ($P(\\text{{tx}} \\mid \\text{{cart}}) = {cal_med['conversion_rate']*100:.2f}\\%$).
 3. **Random and Oracle Slate CTR by Environment Variant (30 Evaluation Seeds, Horizon 20,000)**:
    - **Well-Specified Base**: Random CTR = {primary['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {primary['Oracle']['slate_ctr']['mean']*100:.2f}%
    - **Hidden Style Factor**: Random CTR = {results['misspecification_robustness']['hidden_style']['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {results['misspecification_robustness']['hidden_style']['Oracle']['slate_ctr']['mean']*100:.2f}%
    - **Nonlinear Interactions**: Random CTR = {results['misspecification_robustness']['nonlinear_interactions']['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {results['misspecification_robustness']['nonlinear_interactions']['Oracle']['slate_ctr']['mean']*100:.2f}%
-   - **High Funnel Conversion**: Random CTR = {results['misspecification_robustness']['high_funnel_conversion']['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {results['misspecification_robustness']['high_funnel_conversion']['Oracle']['slate_ctr']['mean']*100:.2f}%
+   - **High Funnel Conversion**: Random CTR = {results['misspecification_robustness']['high_funnel_conversion']['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {results['misspecification_robustness']['high_funnel_conversion']['Oracle']['slate_ctr']['mean']*100:.2f}%.
 
 ### Jensen's Inequality Convexity Effect:
 On negative logit ranges (where $\\beta_{{\\text{{click}}}} = 5.72$ places latent utility in the negative domain), the sigmoid activation $\\sigma(x) = 1 / (1 + e^{{-x}})$ is strictly convex. By Jensen's inequality:
@@ -606,14 +607,15 @@ def generate_benchmark_report(results: Dict[str, Any]):
 - **Evaluation Scenario**: **Abrupt Preference Drift** at midpoint ($t=10,000$), **Medium Difficulty** (Gaussian logit noise $\\sigma = 0.40$), Horizon $T = 20,000$ rounds, 30 independent evaluation seeds.
 - **Tuned Hyper-parameters**: $\\alpha^* = {meta['best_alpha']}$, $\\gamma^* = {meta['best_gamma']}$ (tuned on separate tuning seeds 101-105).
 - **A2 Identity Resolved**: Discounted LinUCB with $\\gamma = 1.0$ matches Cold LinUCB identically to $10^{{-16}}$ floating precision bit-for-bit across all 30 evaluation seeds ({primary['Cold LinUCB']['cumulative_regret']['mean']:,.1f} vs {primary['Discounted LinUCB (gamma=1.0)']['cumulative_regret']['mean']:,.1f}). Root causes (process-salted `hash()` on brand and unstable sorting ties) have been permanently resolved.
-- **Two-Stage Hybrids Decisively Beat the Department Heuristic**:
+- **Two-Stage Hybrids Outperform the Department Heuristic**:
   - `Dept-Restricted LinUCB (Cold)` achieves **{primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f}** cumulative regret, outperforming the Department Heuristic (**{primary['Department Heuristic']['cumulative_regret']['mean']:,.1f}**) by **{primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f} points** (Holm-corrected $p < 0.001$).
-  - `Dept-Restricted LinUCB (Discounted)` achieves **{primary['Dept-Restricted LinUCB (Discounted)']['cumulative_regret']['mean']:,.1f}**, beating the heuristic by **{primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Dept-Restricted LinUCB (Discounted)']['cumulative_regret']['mean']:,.1f} points**.
-  - `Residual LinUCB` achieves **{primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f}**, beating the heuristic by **{primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f} points**.
+  - `Dept-Restricted LinUCB (Discounted)` achieves **{primary['Dept-Restricted LinUCB (Discounted)']['cumulative_regret']['mean']:,.1f}**, achieving lower regret than the heuristic by **{primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Dept-Restricted LinUCB (Discounted)']['cumulative_regret']['mean']:,.1f} points**.
+  - `Residual LinUCB` achieves **{primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f}**, achieving lower regret than the heuristic by **{primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f} points**.
 - **Trajectory Oracle Expected Reward Reconciliation**:
   For every policy $\\pi$, step regret is $R^*(u_t, t) - R(u_t, a_t)$. Summing over all $T$ rounds yields the exact mathematical identity:
   $$\\text{{Cumulative Reward}}(\\pi) + \\text{{Cumulative Regret}}(\\pi) \\equiv R^*_{{\\text{{trajectory}}}}(\\pi) = \\sum_{{t=1}}^T R^*(u_t, t)$$
   The trajectory oracle varies from **{primary['Random']['cumulative_trajectory_oracle_reward']['mean']:,.1f}** (Random minimum) to **{primary['Oracle']['cumulative_trajectory_oracle_reward']['mean']:,.1f}** (Oracle) because the repeat bonus accumulates along active served paths.
+- **Parity Test Scope**: The parity test covers policy scoring logic with identical inputs, not the live feature extraction pipeline.
 
 ### Headline Results (All 26 Evaluated Policies):
 {table_1}
@@ -633,7 +635,7 @@ Paired Holm-corrected tests comparing Discounted LinUCB for the pre-specified tu
 Candidate gammas evaluated on separate tuning seeds (101-105) for parameter selection and on 30 evaluation seeds (1-30) for unbiased evaluation:
 {table_gamma}
 
-- **Selection Curve**: On tuning seeds 101-105, $\\gamma = 0.9995$ achieves lowest regret ({results['hyperparameter_tuning']['gamma_sweep']['0.9995']:,.1f}) across the 7-value candidate grid, confirming its status as the optimal discount factor under abrupt drift.
+- **Selection Curve**: On tuning seeds 101-105, $\\gamma = 0.9995$ achieves lowest regret ({results['hyperparameter_tuning']['gamma_sweep']['0.9995']:,.1f}) across the 7-value candidate grid, yielding the lowest tuning regret under abrupt drift.
 
 ---
 
@@ -643,7 +645,7 @@ Evaluating candidate restriction (Stage 1 heuristic department selection + Stage
 
 ### Scientific Findings on Hybrids:
 1. **Candidate Restriction Beats Both Baselines**: Restricting Cold LinUCB to rank products within the user's active target department (`Dept-Restricted LinUCB (Cold)`) eliminates catalog-wide exploration penalties while retaining the capacity to rank items by rating, price, and repeat bonus. This drops regret from $2,942.0$ (Cold LinUCB) and $2,225.6$ (Department Heuristic) down to **{primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f}** (a **{primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f} point improvement** over the heuristic, $p < 0.001$).
-2. **Residual LinUCB Rescaled**: The heuristic offset ($h_{{\text{{offset}}}} = 0.35$) was derived from first principles to match the simulator's latent expected utility ($\mathbb{{E}}[V] \approx 0.1..0.5$) rather than fit on evaluation seeds. Evaluated across tuning seeds 101-105, this offset enables Residual LinUCB to achieve **{primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f}**, resolving the Phase 12A implementation defect.
+2. **Residual LinUCB Rescaled**: The heuristic offset ($h_{{\text{{offset}}}} = 0.35$) was derived from first principles to match the simulator's latent expected utility scale ($\mathbb{{E}}[V] \approx 0.1..0.5$) rather than fit on evaluation seeds. Checked across tuning seeds 101-105 only, this offset enables Residual LinUCB to achieve **{primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f}**, resolving the Phase 12A implementation defect. Because the offset is informed by simulator latent utility scales, Residual LinUCB is labelled environment-informed and excluded from the core supported claims table.
 3. **Exploration Quota Trade-Off**: Allocating 2 exploratory slots across the catalog (`m_explore=2`) yields regret **{primary['Dept-Restricted LinUCB + Expl (Cold, m=2)']['cumulative_regret']['mean']:,.1f}**, which outperforms the Department Heuristic by {primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Dept-Restricted LinUCB + Expl (Cold, m=2)']['cumulative_regret']['mean']:,.1f} points while providing active cross-department discovery.
 
 ---
@@ -660,12 +662,12 @@ Separating preference drift ($t=10,000$) from the introduction of 12 cold-start 
 Evaluating policy stability when the true environment violates LinUCB's 36-dimensional linear assumption:
 {table_misspec}
 
-### Plain Verdict on Heuristic Failure:
-> [!WARNING]
-> **The Department Heuristic LOSES when assumptions fail**:
-> While the Department Heuristic exploits category dominance in the well-specified base environment, **it degrades severely under nonlinear feature interactions**, accumulating **{misspec['nonlinear_interactions']['Department Heuristic']['cumulative_regret']['mean']:,.1f}** cumulative regret ({misspec['nonlinear_interactions']['Department Heuristic']['regret_share']['mean']*100:.1f}% regret share).
-> In stark contrast, learning bandits adapt to price $\\times$ category offsets and rating $\\times$ discount synergies, achieving **{misspec['nonlinear_interactions']['Cold LinUCB']['cumulative_regret']['mean']:,.1f}** (Cold LinUCB), **{misspec['nonlinear_interactions']['Discounted LinUCB (gamma=0.9995)']['cumulative_regret']['mean']:,.1f}** (Discounted LinUCB), and **{misspec['nonlinear_interactions']['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f}** (Dept-Restricted LinUCB).
-> Under nonlinear customer choice, adaptive learning policies outperform the static heuristic by **more than 8,000 regret points**!
+### Analysis of Heuristic Performance Under Model Misspecification:
+> [!NOTE]
+> **Heuristic Sensitivity to Nonlinear Customer Choice**:
+> While the Department Heuristic performs well in the base environment where category affinity dominates, its regret share rises to **{misspec['nonlinear_interactions']['Department Heuristic']['regret_share']['mean']*100:.1f}%** ({misspec['nonlinear_interactions']['Department Heuristic']['cumulative_regret']['mean']:,.1f} cumulative regret) under nonlinear feature interactions (price $\\times$ category offsets and rating $\\times$ discount synergies).
+> In contrast, adaptive bandits adjust to interaction effects, achieving **{misspec['nonlinear_interactions']['Cold LinUCB']['cumulative_regret']['mean']:,.1f}** (Cold LinUCB, {misspec['nonlinear_interactions']['Cold LinUCB']['regret_share']['mean']*100:.1f}% regret share), **{misspec['nonlinear_interactions']['Discounted LinUCB (gamma=0.9995)']['cumulative_regret']['mean']:,.1f}** (Discounted LinUCB, {misspec['nonlinear_interactions']['Discounted LinUCB (gamma=0.9995)']['regret_share']['mean']*100:.1f}%), and **{misspec['nonlinear_interactions']['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f}** (Dept-Restricted LinUCB, {misspec['nonlinear_interactions']['Dept-Restricted LinUCB (Cold)']['regret_share']['mean']*100:.1f}%).
+> Under nonlinear customer choice, adaptive learning policies accumulate lower regret than the static heuristic by **{misspec['nonlinear_interactions']['Department Heuristic']['cumulative_regret']['mean'] - misspec['nonlinear_interactions']['Cold LinUCB']['cumulative_regret']['mean']:,.1f} points**.
 
 ---
 
@@ -706,14 +708,83 @@ All Phase 12A-2 numbers are computed under deterministic cache validation (`conf
 
 
 def generate_chat_summary(results: Dict[str, Any]):
-    """Generates docs/summary_for_chat.txt and docs/phase12a2_summary_for_chat.txt."""
+    """Generates docs/summary_for_chat.txt, docs/phase12a2_summary_for_chat.txt, and docs/phase12b_summary_for_chat.txt."""
     primary = results["primary_benchmark"]
     warm = results["warm_start_sweep"]
     misspec = results["misspecification_robustness"]
-    before_after = results.get("before_after_comparison", {})
 
-    summary_phase12a2 = f"""================================================================================
-SMARTCART AI — PHASE 12A-2 AUTHORITATIVE BENCHMARK SUMMARY (Single Ground Truth)
+    # Load offline erratum if available
+    erratum_path = ROOT_DIR / "experiments" / "results" / "offline_erratum_phase12c.json"
+    erratum_data = {}
+    if erratum_path.exists():
+        with open(erratum_path, "r", encoding="utf-8") as f:
+            erratum_data = json.load(f).get("results", {})
+
+    # Robustness Table
+    rob_rows = [
+        ("Dept-Restricted LinUCB (Cold, m=0)", "Dept-Restricted LinUCB (Cold)"),
+        ("Dept-Restricted LinUCB (Cold, m=2)", "Dept-Restricted LinUCB + Expl (Cold, m=2)"),
+        ("Dept-Restricted LinUCB (Disc, m=0)", "Dept-Restricted LinUCB (Discounted)"),
+        ("Dept-Restricted LinUCB (Disc, m=2)", "Dept-Restricted LinUCB + Expl (Discounted, m=2)"),
+        ("Residual LinUCB", "Residual LinUCB"),
+        ("Cold LinUCB", "Cold LinUCB"),
+        ("Discounted LinUCB (gamma*=0.9995)", "Discounted LinUCB (gamma=0.9995)"),
+        ("Department Heuristic", "Department Heuristic"),
+        ("Warm LinUCB (N_cap=10,000)", "Warm LinUCB"),
+        ("Recently Viewed + Popularity", "Recently Viewed + Popularity"),
+        ("Popularity", "Popularity"),
+        ("Random", "Random"),
+    ]
+    rob_lines = [
+        f"{'Policy':<42} | {'Base':<6} | {'Hidden':<6} | {'Nonlin':<6} | {'Funnel':<6} | {'Average':<7} | {'Worst':<6}",
+        "-" * 90
+    ]
+    for lbl, k in rob_rows:
+        b = primary[k]['regret_share']['mean'] * 100
+        h = misspec['hidden_style'][k]['regret_share']['mean'] * 100
+        n = misspec['nonlinear_interactions'][k]['regret_share']['mean'] * 100
+        f_val = misspec['high_funnel_conversion'][k]['regret_share']['mean'] * 100
+        avg = (b + h + n + f_val) / 4.0
+        worst = max(b, h, n, f_val)
+        rob_lines.append(f"{lbl:<42} | {b:5.1f}% | {h:5.1f}% | {n:5.1f}% | {f_val:5.1f}% | {avg:6.1f}% | {worst:5.1f}%")
+    table_robustness = "\n".join(rob_lines)
+
+    # Warm Start Sweep Table
+    warm_lines = [
+        f"{'Policy':<15} | {'N_cap':<6} | {'Regret':<10} | {'95% CI':<18} | {'Reward':<10}",
+        "-" * 65
+    ]
+    for p in ["Warm LinUCB", "Warm LinTS"]:
+        for ncap in ["0", "500", "2000", "10000"]:
+            entry = warm[p][ncap]
+            reg = entry['cumulative_regret']['mean']
+            ci = entry['cumulative_regret']['ci_95']
+            rew = entry['cumulative_reward']['mean']
+            warm_lines.append(f"{p:<15} | {ncap:<6} | {reg:8.1f} | [{ci[0]:.1f}, {ci[1]:.1f}]  | {rew:8.1f}")
+    table_warm_sweep = "\n".join(warm_lines)
+
+    # Offline Erratum Table
+    erratum_lines = [
+        f"{'Slice':<8} | {'Policy':<22} | {'Metric':<6} | {'Frozen':<8} | {'Regenerated':<12} | {'Delta':<10}",
+        "-" * 75
+    ]
+    if erratum_data:
+        for s in ["overall", "novel", "repeat"]:
+            for pol in ["Popularity Baseline", "Department Heuristic", "RecentlyViewed", "Cold LinUCB", "Warm LinUCB"]:
+                if pol in erratum_data.get(s, {}):
+                    e = erratum_data[s][pol]
+                    f_mac = e["macro_frozen"]["mean"] * 100
+                    r_mac = e["macro_regenerated"]["mean"] * 100
+                    d_mac = e["macro_delta_pp"]
+                    erratum_lines.append(f"{s:<8} | {pol:<22} | Macro  | {f_mac:5.2f}% | {r_mac:5.2f}%      | {d_mac:+6.3f} pp")
+                    f_mic = e["micro_frozen"]["mean"] * 100
+                    r_mic = e["micro_regenerated"]["mean"] * 100
+                    d_mic = e["micro_delta_pp"]
+                    erratum_lines.append(f"{s:<8} | {pol:<22} | Micro  | {f_mic:5.2f}% | {r_mic:5.2f}%      | {d_mic:+6.3f} pp")
+    table_erratum = "\n".join(erratum_lines)
+
+    summary_phase12c = f"""================================================================================
+SMARTCART AI — PHASE 12C AUTHORITATIVE BENCHMARK SUMMARY (Single Ground Truth)
 ================================================================================
 
 1. PRIMARY HEADLINE BENCHMARK (30 Seeds, Abrupt Drift, Medium Noise sigma=0.40, Horizon 20,000):
@@ -736,35 +807,34 @@ SMARTCART AI — PHASE 12A-2 AUTHORITATIVE BENCHMARK SUMMARY (Single Ground Trut
    - Popularity:                           Regret = {primary['Popularity']['cumulative_regret']['mean']:,.1f} [{primary['Popularity']['cumulative_regret']['ci_95'][0]:,.1f}, {primary['Popularity']['cumulative_regret']['ci_95'][1]:,.1f}]
    - Random:                               Regret = {primary['Random']['cumulative_regret']['mean']:,.1f} [{primary['Random']['cumulative_regret']['ci_95'][0]:,.1f}, {primary['Random']['cumulative_regret']['ci_95'][1]:,.1f}]
 
-2. A2 BIT-FOR-BIT DETERMINISM & IDENTITY:
-   - Discounted LinUCB (gamma=1.0) == Cold LinUCB: Diff = 0.0000000000000000 (Regret = {primary['Cold LinUCB']['cumulative_regret']['mean']:,.1f}) across all 30 evaluation seeds!
+2. POLICY ROBUSTNESS ACROSS ENVIRONMENTS (Regret Share %):
+{table_robustness}
 
-3. TWO-STAGE HYBRIDS BREAKTHROUGH:
-   - Dept-Restricted LinUCB (Cold) achieves Regret = {primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f}, decisively outperforming Department Heuristic ({primary['Department Heuristic']['cumulative_regret']['mean']:,.1f}) by {primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f} points (p < 0.001)!
-   - Residual LinUCB achieves Regret = {primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f}, outperforming Department Heuristic by {primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f} points.
+3. WARM-START SWEEP (N_cap in {{0, 500, 2000, 10000}}):
+{table_warm_sweep}
 
-4. MISSPECIFICATION ROBUSTNESS & HEURISTIC DEFEAT:
-   - Base Environment: Heuristic = {primary['Department Heuristic']['cumulative_regret']['mean']:,.1f} | Cold LinUCB = {primary['Cold LinUCB']['cumulative_regret']['mean']:,.1f} | Dept-Restricted = {primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f}
-   - Nonlinear Interactions: Heuristic = {misspec['nonlinear_interactions']['Department Heuristic']['cumulative_regret']['mean']:,.1f} | Cold LinUCB = {misspec['nonlinear_interactions']['Cold LinUCB']['cumulative_regret']['mean']:,.1f} | Dept-Restricted = {misspec['nonlinear_interactions']['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f}
-   - Verdict: The Department Heuristic collapses under nonlinear interactions ({misspec['nonlinear_interactions']['Department Heuristic']['cumulative_regret']['mean']:,.1f} regret), losing to learning bandits by more than 8,000 regret points!
+4. OFFLINE EVALUATION DIRECT ERRATUM (Frozen Phase 10D vs Regenerated Post Brand-Hash Fix):
+{table_erratum}
 
-5. MATHEMATICAL IDENTITY & TRAJECTORY ORACLE:
-   - For all policies: Reward(pi) + Regret(pi) == Trajectory Oracle Expected Reward(pi)
-   - Sums vary from {primary['Random']['cumulative_trajectory_oracle_reward']['mean']:,.1f} (Random minimum) to {primary['Oracle']['cumulative_trajectory_oracle_reward']['mean']:,.1f} (Oracle) because repeat bonus accumulates along active paths.
-
-6. WARM-START & DETERMINISM PARITY:
-   - Warm LinUCB (N_cap=0): Regret = {warm['Warm LinUCB']['0']['cumulative_regret']['mean']:,.1f} == Cold LinUCB ({primary['Cold LinUCB']['cumulative_regret']['mean']:,.1f})
-   - Warm LinTS (N_cap=0):  Regret = {warm['Warm LinTS']['0']['cumulative_regret']['mean']:,.1f} == Cold LinTS ({primary['Cold LinTS']['cumulative_regret']['mean']:,.1f})
+5. DETERMINISM & IDENTITIES:
+   - Discounted LinUCB (gamma=1.0) == Cold LinUCB: Diff = 0.0000000000000000 across all 30 evaluation seeds.
+   - For all policies: Reward(pi) + Regret(pi) == Trajectory Oracle Expected Reward(pi).
+   - Zero-Cap Parity: Warm LinUCB (N_cap=0) == Cold LinUCB identically.
+   - Parity scope: Parity covers policy scoring logic with identical inputs, not the live feature extraction pipeline.
 ================================================================================
 """
 
     out_file12a2 = DOCS_DIR / "phase12a2_summary_for_chat.txt"
     with open(out_file12a2, "w", encoding="utf-8") as f:
-        f.write(summary_phase12a2)
+        f.write(summary_phase12c)
+
+    out_file12b = DOCS_DIR / "phase12b_summary_for_chat.txt"
+    with open(out_file12b, "w", encoding="utf-8") as f:
+        f.write(summary_phase12c)
 
     out_file12a = DOCS_DIR / "phase12a_summary_for_chat.txt"
     with open(out_file12a, "w", encoding="utf-8") as f:
-        f.write(summary_phase12a2)
+        f.write(summary_phase12c)
 
     phase10d_block = """================================================================================
 SMARTCART AI — PHASE 10D CONSOLIDATED OFFLINE EVALUATION (Single Ground Truth)
@@ -787,6 +857,7 @@ AUTHORITATIVE KEY NUMBERS (Auto-generated from offline_master_results.json):
    - RecentlyViewed Baseline:   Overall Macro=13.10% (Micro=24.97%) | Novel Macro=5.66% | Repeat Macro=99.81%
    - Cold LinUCB (alpha=0.5):   Overall Macro=6.73% (Micro=8.39%) | Novel Macro=5.60%
    - Warm LinUCB (Frozen):      Overall Macro=11.20% (Micro=18.33%) | Novel Macro=5.82% | Repeat Macro=71.36%
+   - Warm LinUCB (Regenerated): Overall Macro=10.87% (Micro=18.20%) | Novel Macro=5.46% | Repeat Macro=71.66%
    - Warm LinTS (v=0.25):       Overall Macro=11.07% (Micro=18.21%) | Novel Macro=5.75%
    - Hybrid Slate (k=3 RV+Lin): Overall Macro=13.16% (Micro=24.41%)
    - Hybrid Slate (k=5 RV+Lin): Overall Macro=13.01% (Micro=24.67%)
@@ -800,7 +871,7 @@ AUTHORITATIVE KEY NUMBERS (Auto-generated from offline_master_results.json):
    - Prequential Catch-Up Step: Step 8349 (Cold rolling HR enters within 1 SE of Warm rolling HR)
 ================================================================================
 """
-    combined_summary = phase10d_block.strip() + "\n\n" + summary_phase12a2.strip() + "\n"
+    combined_summary = phase10d_block.strip() + "\n\n" + summary_phase12c.strip() + "\n"
     out_file = DOCS_DIR / "summary_for_chat.txt"
     with open(out_file, "w", encoding="utf-8") as f:
         f.write(combined_summary)
@@ -825,6 +896,7 @@ def update_readme_section_9_1(results: Dict[str, Any]):
     pop = primary["Popularity"]
     rv = primary["Recently Viewed + Popularity"]
     oracle = primary["Oracle"]
+    rand = primary["Random"]
 
     sec_9_1 = f"""
 ### 9.1 Calibrated Simulator v2 Benchmark Results (Phase 12A-2 Authoritative)
@@ -837,17 +909,18 @@ def update_readme_section_9_1(results: Dict[str, Any]):
 
 | Policy | Cumulative Regret (Mean [95% CI]) | Traj. Oracle Reward | Regret Share (%) | Slate CTR (%) | Cumulative Reward |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Oracle** | {oracle['cumulative_regret']['mean']:.1f} [{oracle['cumulative_regret']['ci_95'][0]:.1f}, {oracle['cumulative_regret']['ci_95'][1]:.1f}] | {oracle['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {oracle['regret_share']['mean']*100:.1f}% | {oracle['slate_ctr']['mean']*100:.2f}% | {oracle['cumulative_reward']['mean']:,.1f} |
-| **Dept-Restricted LinUCB (Cold)** | {dept_restr['cumulative_regret']['mean']:.1f} [{dept_restr['cumulative_regret']['ci_95'][0]:.1f}, {dept_restr['cumulative_regret']['ci_95'][1]:.1f}] | {dept_restr['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {dept_restr['regret_share']['mean']*100:.1f}% | {dept_restr['slate_ctr']['mean']*100:.2f}% | {dept_restr['cumulative_reward']['mean']:,.1f} |
-| **Dept-Restricted LinUCB (Disc)** | {dept_disc['cumulative_regret']['mean']:.1f} [{dept_disc['cumulative_regret']['ci_95'][0]:.1f}, {dept_disc['cumulative_regret']['ci_95'][1]:.1f}] | {dept_disc['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {dept_disc['regret_share']['mean']*100:.1f}% | {dept_disc['slate_ctr']['mean']*100:.2f}% | {dept_disc['cumulative_reward']['mean']:,.1f} |
-| **Residual LinUCB** | {res_lin['cumulative_regret']['mean']:.1f} [{res_lin['cumulative_regret']['ci_95'][0]:.1f}, {res_lin['cumulative_regret']['ci_95'][1]:.1f}] | {res_lin['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {res_lin['regret_share']['mean']*100:.1f}% | {res_lin['slate_ctr']['mean']*100:.2f}% | {res_lin['cumulative_reward']['mean']:,.1f} |
-| **Department Heuristic** | {dept['cumulative_regret']['mean']:.1f} [{dept['cumulative_regret']['ci_95'][0]:.1f}, {dept['cumulative_regret']['ci_95'][1]:.1f}] | {dept['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {dept['regret_share']['mean']*100:.1f}% | {dept['slate_ctr']['mean']*100:.2f}% | {dept['cumulative_reward']['mean']:,.1f} |
-| **Slate Mixing (k=5)** | {slate5['cumulative_regret']['mean']:.1f} [{slate5['cumulative_regret']['ci_95'][0]:.1f}, {slate5['cumulative_regret']['ci_95'][1]:.1f}] | {slate5['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {slate5['regret_share']['mean']*100:.1f}% | {slate5['slate_ctr']['mean']*100:.2f}% | {slate5['cumulative_reward']['mean']:,.1f} |
-| **Discounted LinUCB (gamma*=0.9995)** | {disc['cumulative_regret']['mean']:.1f} [{disc['cumulative_regret']['ci_95'][0]:.1f}, {disc['cumulative_regret']['ci_95'][1]:.1f}] | {disc['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {disc['regret_share']['mean']*100:.1f}% | {disc['slate_ctr']['mean']*100:.2f}% | {disc['cumulative_reward']['mean']:,.1f} |
-| **Cold LinUCB (alpha*=0.5)** | {cold['cumulative_regret']['mean']:.1f} [{cold['cumulative_regret']['ci_95'][0]:.1f}, {cold['cumulative_regret']['ci_95'][1]:.1f}] | {cold['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {cold['regret_share']['mean']*100:.1f}% | {cold['slate_ctr']['mean']*100:.2f}% | {cold['cumulative_reward']['mean']:,.1f} |
-| **Warm LinUCB** | {warm['cumulative_regret']['mean']:.1f} [{warm['cumulative_regret']['ci_95'][0]:.1f}, {warm['cumulative_regret']['ci_95'][1]:.1f}] | {warm['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {warm['regret_share']['mean']*100:.1f}% | {warm['slate_ctr']['mean']*100:.2f}% | {warm['cumulative_reward']['mean']:,.1f} |
-| **Recently Viewed + Pop** | {rv['cumulative_regret']['mean']:.1f} [{rv['cumulative_regret']['ci_95'][0]:.1f}, {rv['cumulative_regret']['ci_95'][1]:.1f}] | {rv['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {rv['regret_share']['mean']*100:.1f}% | {rv['slate_ctr']['mean']*100:.2f}% | {rv['cumulative_reward']['mean']:,.1f} |
-| **Popularity** | {pop['cumulative_regret']['mean']:.1f} [{pop['cumulative_regret']['ci_95'][0]:.1f}, {pop['cumulative_regret']['ci_95'][1]:.1f}] | {pop['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {pop['regret_share']['mean']*100:.1f}% | {pop['slate_ctr']['mean']*100:.2f}% | {pop['cumulative_reward']['mean']:,.1f} |
+| **Oracle** | {oracle['cumulative_regret']['mean']:,.1f} [{oracle['cumulative_regret']['ci_95'][0]:,.1f}, {oracle['cumulative_regret']['ci_95'][1]:,.1f}] | {oracle['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {oracle['regret_share']['mean']*100:.1f}% | {oracle['slate_ctr']['mean']*100:.2f}% | {oracle['cumulative_reward']['mean']:,.1f} |
+| **Dept-Restricted LinUCB (Cold)** | {dept_restr['cumulative_regret']['mean']:,.1f} [{dept_restr['cumulative_regret']['ci_95'][0]:,.1f}, {dept_restr['cumulative_regret']['ci_95'][1]:,.1f}] | {dept_restr['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {dept_restr['regret_share']['mean']*100:.1f}% | {dept_restr['slate_ctr']['mean']*100:.2f}% | {dept_restr['cumulative_reward']['mean']:,.1f} |
+| **Dept-Restricted LinUCB (Disc)** | {dept_disc['cumulative_regret']['mean']:,.1f} [{dept_disc['cumulative_regret']['ci_95'][0]:,.1f}, {dept_disc['cumulative_regret']['ci_95'][1]:,.1f}] | {dept_disc['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {dept_disc['regret_share']['mean']*100:.1f}% | {dept_disc['slate_ctr']['mean']*100:.2f}% | {dept_disc['cumulative_reward']['mean']:,.1f} |
+| **Residual LinUCB** | {res_lin['cumulative_regret']['mean']:,.1f} [{res_lin['cumulative_regret']['ci_95'][0]:,.1f}, {res_lin['cumulative_regret']['ci_95'][1]:,.1f}] | {res_lin['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {res_lin['regret_share']['mean']*100:.1f}% | {res_lin['slate_ctr']['mean']*100:.2f}% | {res_lin['cumulative_reward']['mean']:,.1f} |
+| **Department Heuristic** | {dept['cumulative_regret']['mean']:,.1f} [{dept['cumulative_regret']['ci_95'][0]:,.1f}, {dept['cumulative_regret']['ci_95'][1]:,.1f}] | {dept['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {dept['regret_share']['mean']*100:.1f}% | {dept['slate_ctr']['mean']*100:.2f}% | {dept['cumulative_reward']['mean']:,.1f} |
+| **Slate Mixing (k=5)** | {slate5['cumulative_regret']['mean']:,.1f} [{slate5['cumulative_regret']['ci_95'][0]:,.1f}, {slate5['cumulative_regret']['ci_95'][1]:,.1f}] | {slate5['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {slate5['regret_share']['mean']*100:.1f}% | {slate5['slate_ctr']['mean']*100:.2f}% | {slate5['cumulative_reward']['mean']:,.1f} |
+| **Discounted LinUCB (gamma*=0.9995)** | {disc['cumulative_regret']['mean']:,.1f} [{disc['cumulative_regret']['ci_95'][0]:,.1f}, {disc['cumulative_regret']['ci_95'][1]:,.1f}] | {disc['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {disc['regret_share']['mean']*100:.1f}% | {disc['slate_ctr']['mean']*100:.2f}% | {disc['cumulative_reward']['mean']:,.1f} |
+| **Cold LinUCB (alpha*=0.5)** | {cold['cumulative_regret']['mean']:,.1f} [{cold['cumulative_regret']['ci_95'][0]:,.1f}, {cold['cumulative_regret']['ci_95'][1]:,.1f}] | {cold['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {cold['regret_share']['mean']*100:.1f}% | {cold['slate_ctr']['mean']*100:.2f}% | {cold['cumulative_reward']['mean']:,.1f} |
+| **Warm LinUCB** | {warm['cumulative_regret']['mean']:,.1f} [{warm['cumulative_regret']['ci_95'][0]:,.1f}, {warm['cumulative_regret']['ci_95'][1]:,.1f}] | {warm['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {warm['regret_share']['mean']*100:.1f}% | {warm['slate_ctr']['mean']*100:.2f}% | {warm['cumulative_reward']['mean']:,.1f} |
+| **Recently Viewed + Pop** | {rv['cumulative_regret']['mean']:,.1f} [{rv['cumulative_regret']['ci_95'][0]:,.1f}, {rv['cumulative_regret']['ci_95'][1]:,.1f}] | {rv['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {rv['regret_share']['mean']*100:.1f}% | {rv['slate_ctr']['mean']*100:.2f}% | {rv['cumulative_reward']['mean']:,.1f} |
+| **Popularity** | {pop['cumulative_regret']['mean']:,.1f} [{pop['cumulative_regret']['ci_95'][0]:,.1f}, {pop['cumulative_regret']['ci_95'][1]:,.1f}] | {pop['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {pop['regret_share']['mean']*100:.1f}% | {pop['slate_ctr']['mean']*100:.2f}% | {pop['cumulative_reward']['mean']:,.1f} |
+| **Random** | {rand['cumulative_regret']['mean']:,.1f} [{rand['cumulative_regret']['ci_95'][0]:,.1f}, {rand['cumulative_regret']['ci_95'][1]:,.1f}] | {rand['cumulative_trajectory_oracle_reward']['mean']:,.1f} | {rand['regret_share']['mean']*100:.1f}% | {rand['slate_ctr']['mean']*100:.2f}% | {rand['cumulative_reward']['mean']:,.1f} |
 
 See [`docs/phase12a2-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/phase12a2-report.md) and [`docs/sim_assumptions.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/sim_assumptions.md) for complete details.
 """
@@ -879,6 +952,71 @@ See [`docs/phase12a2-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-A
     print("Updated README.md Section 9.1")
 
 
+def update_readme_section_9_2():
+    """Injects or updates Phase 12C Erratum in Section 9.2 of README.md."""
+    readme_path = ROOT_DIR / "README.md"
+    if not readme_path.exists():
+        return
+
+    erratum_path = ROOT_DIR / "experiments" / "results" / "offline_erratum_phase12c.json"
+    if not erratum_path.exists():
+        return
+
+    with open(erratum_path, "r", encoding="utf-8") as f:
+        err_json = json.load(f)
+
+    max_delta = err_json.get("max_delta_pp", 0.0)
+
+    erratum_sec = f"""
+#### 9.2.2.1 Phase 12C Erratum: Impact of Brand Hashing Fix on Frozen Metrics
+Following the deterministic cryptographic hash audit (`compute_brand_bucket`), offline sufficient statistics were regenerated. A direct recomputation across the 335,612 held-out test events under the frozen Phase 10D protocol confirms that all 4 non-feature baselines are identical to floating precision ($\\\\Delta = 0.000$ pp), while Warm LinUCB shows minor variations (maximum $\\\\Delta = {max_delta:.3f}$ pp):
+
+| Slice | Policy | Frozen Metric (Phase 10D) | Regenerated (Post-Fix) | Delta pp |
+| :--- | :--- | :--- | :--- | :--- |
+| **Overall** | Warm LinUCB | Macro: 11.20% [11.08%, 11.32%] | Macro: 10.87% [10.75%, 10.99%] | -0.329 pp |
+| **Overall** | Warm LinUCB | Micro: 18.33% [18.08%, 18.57%] | Micro: 18.20% [17.96%, 18.44%] | -0.123 pp |
+| **Novel** | Warm LinUCB | Macro: 5.82% [5.72%, 5.92%] | Macro: 5.46% [5.37%, 5.56%] | -0.355 pp |
+| **Novel** | Warm LinUCB | Micro: 6.13% [6.04%, 6.22%] | Micro: 5.87% [5.77%, 5.96%] | -0.258 pp |
+| **Repeat** | Warm LinUCB | Macro: 71.36% [70.87%, 71.81%] | Macro: 71.66% [71.17%, 72.12%] | +0.299 pp |
+| **Repeat** | Warm LinUCB | Micro: 63.18% [61.77%, 64.42%] | Micro: 63.55% [62.09%, 64.76%] | +0.372 pp |
+
+On pure novel target items, regenerated Warm LinUCB achieves **5.46%** Macro HR@10, which remains below the simple Popularity baseline (**5.76%** [5.66%, 5.85%]) and Cold LinUCB (**5.60%** [5.51%, 5.70%]). This further reinforces the decision to keep `warm_start: OFF` in live production models.
+"""
+
+    with open(readme_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    if "#### 9.2.2.1 Phase 12C Erratum" in content:
+        p1, remainder = content.split("#### 9.2.2.1 Phase 12C Erratum", 1)
+        next_sec_idx = remainder.find("\n#### ")
+        if next_sec_idx == -1:
+            next_sec_idx = remainder.find("\n### ")
+        after = remainder[next_sec_idx:] if next_sec_idx != -1 else ""
+        content = p1 + erratum_sec.strip() + "\n\n" + after.lstrip("\n")
+    else:
+        target = "#### 9.2.3 Novel Target Discovery vs Repeat Intent"
+        if target in content:
+            content = content.replace(target, erratum_sec.strip() + "\n\n" + target)
+
+    # Also update Section 10 item 3 explanation (D5)
+    old_item_3 = "Retailrocket warm-start snapshots are kept backend-only for research comparison and are **NOT applied to live models (`warm_start: OFF`)**. Live models initialize with cold identity covariances ($A = I_d, b = 0$) and learn exclusively from incoming user events."
+    new_item_3 = "Retailrocket warm-start snapshots are kept backend-only for research comparison and are **NOT applied to live models (`warm_start: OFF`)**. Reasons: (1) mixed empirical evidence: while a moderate $N_{\\text{cap}} = 500$ helps standard LinUCB under preference drift in the simulator, it is untested for the default live two-stage hybrid policy (`Dept-Restricted LinUCB + Expl m=2`); (2) on Retailrocket offline held-out novel targets, Warm LinUCB achieves 5.46% Macro HR@10, which does not exceed the simple Popularity baseline (5.76%) or Cold LinUCB (5.60%). Live models initialize with cold identity covariances ($A = I_d, b = 0$) and learn online exclusively from incoming user events."
+    if old_item_3 in content:
+        content = content.replace(old_item_3, new_item_3)
+
+    # Also add parity scope statement if not present (D3)
+    parity_stmt = "The parity test covers policy scoring logic with identical inputs, not the live feature extraction pipeline."
+    if parity_stmt not in content:
+        content = content.replace(
+            "All Phase 11 and Phase 12A numbers are superseded.",
+            f"All Phase 11 and Phase 12A numbers are superseded. {parity_stmt}"
+        )
+
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print("Updated README.md Section 9.2 Erratum and Section 10 live warm-start rationale.")
+
+
 def main():
     results = load_master_results()
     generate_plots(results)
@@ -886,7 +1024,8 @@ def main():
     generate_benchmark_report(results)
     generate_chat_summary(results)
     update_readme_section_9_1(results)
-    print("Phase 12A-2 report and plot generation completed successfully!")
+    update_readme_section_9_2()
+    print("Phase 12C report and plot generation completed successfully.")
 
 
 if __name__ == "__main__":

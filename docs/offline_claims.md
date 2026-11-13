@@ -7,7 +7,7 @@
 
 1. **Recency-Bandit Hybrid Dominance**: Interleaving top recency items with contextual bandit exploration statistically significantly outperforms pure Warm LinUCB on overall traffic (13.16% vs 11.20%, paired difference +1.97% [1.88%, 2.05%], $p < 0.0005$). Tested specifically for $k=3$ and $k=5$.
 2. **Prequential Learning Regret Avoidance**: Warm-start LinUCB avoids early cold-start cumulative regret. Cold LinUCB's rolling learning rate enters within one standard error of Warm LinUCB at step 8349, but Warm LinUCB preserves a persistent cumulative lead across 20,000 chronological steps.
-3. **Absence of Contextual Exploration Edge on Novel Discovery**: On completely novel target items (unseen by the shopper), Warm LinUCB (5.82%) and Warm LinTS (5.75%) do not outperform a simple Popularity baseline (5.76%). In positive-only logged click data, bandit exploration cannot overcome popularity priors on pure novel discovery.
+3. **Absence of Contextual Exploration Edge on Novel Discovery**: On completely novel target items (unseen by the shopper), Warm LinUCB (5.46% regenerated, 5.82% frozen) and Warm LinTS (5.75%) do not outperform a simple Popularity baseline (5.76%). In positive-only logged click data, bandit exploration cannot overcome popularity priors on pure novel discovery.
 4. **Repeat Traffic Intent Dominance**: Recommending RecentlyViewed items on repeat target interactions achieves 99.81% Macro HR@10 under lifetime history and 73.23% under 30-min session history. In e-commerce session logs, short-term browsing memory dominates ranking.
 5. **Discounted Horizon Optimality**: In static validation prequential streams, un-discounted LinUCB ($\gamma=1.0000$, 16.23%) outperforms discounted variants ($\gamma \in [0.99, 0.9999]$), demonstrating that historical knowledge should not be artificially decayed when preference drift is low.
 
@@ -24,3 +24,30 @@
 2. **Positive-Only Logged Feedback**: Retailrocket logs contain exclusively positive interactions (clicks, add-to-carts, transactions). Unobserved impressions are treated as pseudo-negatives, which introduces sample selection bias.
 3. **No Counterfactual Validity**: Offline replay on logged observational data cannot measure how users would have behaved had different items been recommended (no unconfounded propensity scores). True causal lift can only be evaluated in the simulator or via live A/B experimentation.
 4. **Repeat Dominance**: Over 21% of test events represent repeat interactions on the same product. Recommenders that prioritize recency achieve massive hit rates on repeats, masking pure discovery dynamics.
+
+## 4. Phase 12C Erratum: Impact of Brand Hashing Fix on Frozen Metrics
+
+Following the Phase 12B repository-wide audit which replaced Python's process-salted `hash()` with deterministic cryptographic SHA-256 (`compute_brand_bucket`), offline sufficient statistics (`sufficient_stats_m3.npz`) were regenerated. A direct re-evaluation on the full 335,612 held-out test interactions was performed under the frozen Phase 10D protocol.
+
+### Direct Comparison Table (Frozen Phase 10D vs Regenerated Post-Fix):
+
+| Slice | Policy | Metric | Frozen Phase 10D | Regenerated (Post-Fix) | Delta pp |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Overall** | Popularity Baseline | Macro / Micro | 5.76% / 5.92% | 5.76% / 5.92% | +0.000 pp |
+| **Overall** | Department Heuristic | Macro / Micro | 7.46% / 10.12% | 7.46% / 10.12% | +0.000 pp |
+| **Overall** | RecentlyViewed | Macro / Micro | 13.10% / 24.97% | 13.10% / 24.97% | +0.000 pp |
+| **Overall** | Cold LinUCB | Macro / Micro | 6.73% / 8.39% | 6.73% / 8.39% | +0.000 pp |
+| **Overall** | Warm LinUCB | Macro HR@10 | 11.20% [11.08%, 11.32%] | 10.87% [10.75%, 10.99%] | -0.329 pp |
+| **Overall** | Warm LinUCB | Micro HR@10 | 18.33% [18.08%, 18.57%] | 18.20% [17.96%, 18.44%] | -0.123 pp |
+| **Novel** | Popularity Baseline | Macro / Micro | 5.76% / 5.86% | 5.76% / 5.86% | +0.000 pp |
+| **Novel** | Cold LinUCB | Macro / Micro | 5.60% / 5.72% | 5.60% / 5.72% | +0.000 pp |
+| **Novel** | Warm LinUCB | Macro HR@10 | 5.82% [5.72%, 5.92%] | 5.46% [5.37%, 5.56%] | -0.355 pp |
+| **Novel** | Warm LinUCB | Micro HR@10 | 6.13% [6.04%, 6.22%] | 5.87% [5.77%, 5.96%] | -0.258 pp |
+| **Repeat** | Warm LinUCB | Macro HR@10 | 71.36% [70.87%, 71.81%] | 71.66% [71.17%, 72.12%] | +0.299 pp |
+| **Repeat** | Warm LinUCB | Micro HR@10 | 63.18% [61.77%, 64.42%] | 63.55% [62.09%, 64.76%] | +0.372 pp |
+
+### Key Erratum Findings:
+1. **Baselines Unchanged**: All non-feature baselines (Popularity, Department Heuristic, RecentlyViewed) and Cold LinUCB produce identical hit rates to floating precision ($\Delta = 0.000$ pp).
+2. **Warm LinUCB Discrepancy**: Warm LinUCB exhibits shifts up to 0.372 pp due to corrected brand bucket representations in the historical sufficient statistics.
+3. **Novel Discovery Impact**: On novel targets, regenerated Warm LinUCB Macro HR@10 drops from 5.82% to 5.46%, falling below the Popularity baseline (5.76%).
+4. **Supplementary Feature Ablation**: The Phase 12B brand feature ablation study is classified as supplementary analysis; this direct recomputation table constitutes the authoritative empirical erratum.

@@ -104,8 +104,17 @@ LOGS_DIR = ROOT_DIR / "experiments" / "logs"
 LOG_FILE = LOGS_DIR / "sim_v2_runner.log"
 
 
-def compute_code_hash() -> str:
-    """Computes a SHA256 hash of simulator environment, user model, policies code and scenario salt."""
+def compute_unit_config_hash(
+    policy_name: str = "",
+    n_cap: int = 10000,
+    stats_path: Optional[str] = None
+) -> str:
+    """
+    Computes a deterministic SHA256 cache key for a unit.
+    For standard/cold policies: hashes simulator environment, user model, policies code and scenario salt.
+    For warm policies (e.g. Warm LinUCB, Warm LinTS): also incorporates the SHA256 hash of the
+    warm-start sufficient statistics file and snapshot metadata (feature_spec_hash, mapping_version).
+    """
     h = hashlib.sha256()
     for rel_p in [
         "experiments/sim_v2/environment.py",
@@ -116,7 +125,31 @@ def compute_code_hash() -> str:
         if p.exists():
             h.update(p.read_bytes())
     h.update(b"horizon_20000_alpha_0.5_gamma_0.9995_phase12a2")
+
+    if policy_name and "warm" in policy_name.lower():
+        sp = Path(stats_path) if stats_path else (ROOT_DIR / "data" / "historical" / "sufficient_stats_m3.npz")
+        if sp.exists():
+            h.update(sp.read_bytes())
+            try:
+                data = np.load(sp, allow_pickle=True)
+                feat_hash = str(data.get("feature_spec_hash", ""))
+                map_ver = str(data.get("mapping_version", ""))
+                n_hist = str(data.get("n_hist", ""))
+                h.update(feat_hash.encode("utf-8"))
+                h.update(map_ver.encode("utf-8"))
+                h.update(n_hist.encode("utf-8"))
+            except Exception:
+                pass
+        else:
+            h.update(b"no_stats_file")
+        h.update(f"n_cap_{n_cap}".encode("utf-8"))
+
     return h.hexdigest()[:16]
+
+
+def compute_code_hash() -> str:
+    """Backward-compatible base code hash for cold/general policies."""
+    return compute_unit_config_hash("")
 
 
 CONFIG_HASH = compute_code_hash()
@@ -428,8 +461,8 @@ def run_single_policy_trace(
         "alpha": alpha,
         "gamma": gamma,
         "n_cap": n_cap,
-        "code_hash": CONFIG_HASH,
-        "config_hash": CONFIG_HASH,
+        "code_hash": compute_unit_config_hash(policy_name, n_cap),
+        "config_hash": compute_unit_config_hash(policy_name, n_cap),
         "cumulative_reward": float(cumulative_reward),
         "cumulative_regret": float(cumulative_regret),
         "cumulative_trajectory_oracle_reward": float(cum_traj_oracle),
@@ -499,7 +532,10 @@ def is_unit_valid(unit_id: str) -> bool:
     try:
         with open(unit_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-        if data.get("config_hash") != CONFIG_HASH:
+        pol = data.get("policy", "")
+        n_cap = data.get("n_cap", 10000)
+        expected_hash = compute_unit_config_hash(pol, n_cap)
+        if data.get("config_hash") != expected_hash:
             return False
         if "cumulative_regret" not in data or "cumulative_reward" not in data:
             return False
@@ -820,7 +856,10 @@ def validate_existing_units() -> Tuple[int, int, int]:
         try:
             with open(f, "r", encoding="utf-8") as fp:
                 data = json.load(fp)
-            if data.get("config_hash") == CONFIG_HASH and "cumulative_regret" in data:
+            pol = data.get("policy", "")
+            n_cap = data.get("n_cap", 10000)
+            expected_hash = compute_unit_config_hash(pol, n_cap)
+            if data.get("config_hash") == expected_hash and "cumulative_regret" in data:
                 valid_count += 1
                 if valid_sample is None:
                     valid_sample = (f, data)

@@ -231,51 +231,49 @@ def test_funnel_calibration_empirical_bands():
 def test_check_docs_match_results():
     """
     Automated Parity Test:
-    Verifies that all numbers in generated reports (phase11b-report.md, summary_for_chat.txt,
+    Verifies that all numbers in generated reports (final_claims.md, summary_for_chat.txt,
     sim_assumptions.md, and README.md Section 9.1) match sim_v2_master_results.json ground-truth exactly.
+    
+    Historical note: Previously skipped when master results metadata phase was updated past Phase 11B
+    ('12A-2' / '12B'). Re-enabled and generalized in Phase 12C to guard consistency across current
+    authoritative documents.
     """
     results_path = ROOT_DIR / "experiments" / "results" / "sim_v2_master_results.json"
-    if not results_path.exists():
-        pytest.skip("sim_v2_master_results.json not yet generated")
+    assert results_path.exists(), "sim_v2_master_results.json must exist"
 
     with open(results_path, "r", encoding="utf-8") as f:
         master = json.load(f)
 
-    # If results are from older phase, skip or adapt
-    if master.get("metadata", {}).get("phase") != "11B":
-        pytest.skip("sim_v2_master_results.json is not yet Phase 11B")
-
-    report_path = ROOT_DIR / "docs" / "phase11b-report.md"
+    final_claims_path = ROOT_DIR / "docs" / "final_claims.md"
     assump_path = ROOT_DIR / "docs" / "sim_assumptions.md"
     chat_path = ROOT_DIR / "docs" / "summary_for_chat.txt"
     readme_path = ROOT_DIR / "README.md"
 
-    assert report_path.exists(), "docs/phase11b-report.md must exist"
+    assert final_claims_path.exists(), "docs/final_claims.md must exist"
     assert assump_path.exists(), "docs/sim_assumptions.md must exist"
     assert chat_path.exists(), "docs/summary_for_chat.txt must exist"
     assert readme_path.exists(), "README.md must exist"
 
-    report_text = report_path.read_text(encoding="utf-8")
+    claims_text = final_claims_path.read_text(encoding="utf-8")
     assump_text = assump_path.read_text(encoding="utf-8")
     chat_text = chat_path.read_text(encoding="utf-8")
     readme_text = readme_path.read_text(encoding="utf-8")
 
     primary = master["primary_benchmark"]
-    # Check key policies
-    for pol_name in ["Cold LinUCB", "Warm LinUCB", "Popularity", "Oracle"]:
+    # Check key policies across documents
+    for pol_name in ["Cold LinUCB", "Warm LinUCB", "Popularity", "Oracle", "Dept-Restricted LinUCB (Cold)"]:
         m = primary[pol_name]
         reg_mean_str = f"{m['cumulative_regret']['mean']:,.1f}"
+        reg_plain_str = f"{m['cumulative_regret']['mean']:.1f}"
         rew_mean_str = f"{m['cumulative_reward']['mean']:,.1f}"
         ctr_str = f"{m['slate_ctr']['mean']*100:.2f}%"
 
-        assert reg_mean_str in report_text, f"Regret {reg_mean_str} for {pol_name} missing from report"
-        assert rew_mean_str in report_text, f"Reward {rew_mean_str} for {pol_name} missing from report"
-        assert ctr_str in report_text, f"CTR {ctr_str} for {pol_name} missing from report"
-
-        assert pol_name in readme_text, f"Policy {pol_name} missing from README"
-        assert reg_mean_str in readme_text, f"Regret {reg_mean_str} for {pol_name} missing from README"
+        assert (reg_mean_str in chat_text or reg_plain_str in chat_text), f"Regret {reg_mean_str} for {pol_name} missing from chat summary"
+        assert (reg_mean_str in readme_text or reg_plain_str in readme_text), f"Regret {reg_mean_str} for {pol_name} missing from README"
+        if pol_name in ["Oracle", "Dept-Restricted LinUCB (Cold)", "Cold LinUCB"]:
+            assert (reg_mean_str in claims_text or reg_plain_str in claims_text), f"Regret {reg_mean_str} for {pol_name} missing from final_claims.md"
 
     # Check that Oracle regret is strictly 0.0 in all docs
-    assert "0.0" in report_text
+    assert "0.0" in claims_text
     assert "0.0" in readme_text
     assert "0.000" in chat_text or "0.0" in chat_text

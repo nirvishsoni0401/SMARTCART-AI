@@ -12,19 +12,19 @@
 
 ## 1. Supported Scientific Claims (With Paired Statistical Evidence)
 
-### Claim 1: Two-Stage Hybrid (Dept-Restricted LinUCB) Decisively Beats the Department Heuristic
+### Claim 1: Two-Stage Hybrid (Dept-Restricted LinUCB) Outperforms the Department Heuristic
 - **Statement**: Restricting candidate generation to the user's active target department while applying LinUCB ranking across department SKUs achieves significantly lower cumulative regret than the static Department Heuristic under well-specified user choices.
 - **Evidence**:
   - `Dept-Restricted LinUCB (Cold)` achieves **1,429.6** cumulative regret [1,371.8, 1,498.0], outperforming the Department Heuristic (**2,225.6**) by **-796.1 points** (95% CI [-856.5, -729.9]).
   - Paired Holm-adjusted $p < 0.001$, Cohen's $d = 4.354$.
 
-### Claim 2: Two-Stage Hybrid Decisively Beats Standard Catalog-Wide Cold LinUCB
+### Claim 2: Two-Stage Hybrid Outperforms Standard Catalog-Wide Cold LinUCB
 - **Statement**: In multi-department retail catalogs with strong category clustering, restricting LinUCB to rank products within the target department eliminates catalog-wide exploration penalties while retaining personalized ranking by price, rating, and recency.
 - **Evidence**:
   - Drops regret from **2,942.0** (Cold LinUCB) to **1,429.6** (Dept-Restricted LinUCB), an improvement of **-1,512.4 points** (95% CI [-1,613.5, -1,412.0]).
   - Paired Holm-adjusted $p < 0.001$, Cohen's $d = 4.989$.
 
-### Claim 3: Discounted LinUCB (gamma*=0.9995) Successfully Adapts to Abrupt Preference Drift
+### Claim 3: Discounted LinUCB (gamma*=0.9995) Adapts to Abrupt Preference Drift
 - **Statement**: Exponential discounting of historical interactions significantly accelerates adaptation after preference shift ($t=10,000$), outperforming standard LinUCB.
 - **Evidence**:
   - `Discounted LinUCB (gamma*=0.9995)` achieves **2,534.6** vs **2,942.0** for Cold LinUCB, a reduction of **407.4 points** (95% CI [311.1, 502.1]).
@@ -45,8 +45,8 @@
 ### Claim 6: Moderate Warm-Start Benefit vs Negative Transfer Threshold
 - **Statement**: Initializing bandit sufficient statistics with modest historical interaction weight ($N_{\text{cap}} = 500$) accelerates early-horizon learning, but excessive weight ($N_{\text{cap}} = 10,000$) causes negative transfer under preference drift.
 - **Evidence**:
-  - Warm LinUCB cumulative regret: $N_{\text{cap}}=0 \rightarrow 2,942.0$, $N_{\text{cap}}=500 \rightarrow 2,701.9$, $N_{\text{cap}}=2,000 \rightarrow 2,763.0$, $N_{\text{cap}}=10,000 \rightarrow 3,159.7$.
-  - $N_{\text{cap}}=500$ achieves lowest full-horizon regret, while $N_{\text{cap}}=10,000$ degrades performance by 217.7 points compared to cold start.
+  - Warm LinUCB cumulative regret (regenerated post brand-hash fix): $N_{\text{cap}}=0 \rightarrow 2,942.0$, $N_{\text{cap}}=500 \rightarrow 2,677.3$, $N_{\text{cap}}=2,000 \rightarrow 2,813.4$, $N_{\text{cap}}=10,000 \rightarrow 3,381.5$.
+  - $N_{\text{cap}}=500$ achieves lowest full-horizon regret (2,677.3), while $N_{\text{cap}}=10,000$ degrades performance by 439.5 points compared to cold start.
 
 ---
 
@@ -54,28 +54,42 @@
 
 The table below presents the **Regret Share (%)** (lower is better, where Random = 100.0% and Oracle = 0.0%) across all four evaluated environment variants (30 evaluation seeds, $T=20,000$ rounds):
 
-| Policy | Well-Specified Base | Hidden Style Factor | Nonlinear Interactions | High Funnel Conversion |
-| :--- | :---: | :---: | :---: | :---: |
-| **Oracle** | 0.0% | 0.0% | 0.0% | 0.0% |
-| **Dept-Restricted LinUCB (m=2)** | 22.3% | 50.2% | 47.5% | 22.8% |
-| **Dept-Restricted LinUCB (Cold)** | 17.9% | 48.0% | 51.6% | 18.6% |
-| **Residual LinUCB** | 20.2% | 49.5% | 42.6% | 21.8% |
-| **Department Heuristic** | 28.4% | 55.2% | 71.8% | 29.3% |
-| **Discounted LinUCB (gamma*=0.9995)** | 32.1% | 57.0% | 26.6% | 33.8% |
-| **Cold LinUCB (alpha*=0.5)** | 37.5% | 60.3% | 30.6% | 38.0% |
-| **Popularity Baseline** | 65.7% | 78.4% | 88.9% | 66.8% |
-| **Random Baseline** | 72.8% | 83.1% | 88.1% | 74.1% |
+| Policy | Well-Specified Base | Hidden Style Factor | Nonlinear Interactions | High Funnel Conversion | Average Share | Worst-Case Share |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Oracle** | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
+| **Dept-Restricted LinUCB (Cold, m=0)** | 17.9% | 48.0% | 51.6% | 18.6% | 34.1% | 51.6% |
+| **Dept-Restricted LinUCB (Cold, m=2)** | 22.3% | 50.2% | 47.5% | 22.8% | 35.7% | 50.2% |
+| **Dept-Restricted LinUCB (Disc, m=0)** | 18.0% | 48.2% | 51.1% | 18.8% | 34.0% | 51.1% |
+| **Dept-Restricted LinUCB (Disc, m=2)** | 23.6% | 51.5% | 46.2% | 24.4% | 36.4% | 51.5% |
+| **Residual LinUCB** | 20.2% | 49.5% | 42.6% | 21.8% | 33.5% | 49.5% |
+| **Cold LinUCB** | 37.5% | 60.3% | 30.6% | 38.0% | 41.6% | 60.3% |
+| **Discounted LinUCB (gamma*=0.9995)** | 32.1% | 57.0% | 26.6% | 33.8% | 37.4% | 57.0% |
+| **Department Heuristic** | 28.4% | 55.2% | 71.8% | 29.3% | 46.2% | 71.8% |
+| **Warm LinUCB (N_cap=10,000)** | 42.9% | 62.6% | 27.9% | 40.4% | 43.5% | 62.6% |
+| **Recently Viewed + Popularity** | 64.8% | 77.6% | 88.1% | 65.9% | 74.1% | 88.1% |
+| **Popularity Baseline** | 65.7% | 78.4% | 88.9% | 66.8% | 74.9% | 88.9% |
+| **Random Baseline** | 72.8% | 83.1% | 88.1% | 74.1% | 79.5% | 88.1% |
 
 ---
 
-## 3. Withdrawn & Unsupported Claims (Honest Epistemic Boundaries)
+## 3. Withdrawn, Excluded & Unsupported Claims (Honest Epistemic Boundaries)
+
+### Excluded from Supported Claims: Residual LinUCB is Environment-Informed
+- **Classification**: **ENVIRONMENT-INFORMED (EXCLUDED FROM CLAIMS)**.
+- **Explanation**:
+  - Residual LinUCB relies on an empirical heuristic offset $h_{\text{offset}} = 0.35$ derived from the simulator's latent utility scale ($\mathbb{E}[V] \in [0.1, 0.5]$), checked on tuning seeds 101–105 only.
+  - Because this hyperparameter is informed by environment structure that would be unobserved in a real production system without simulator knowledge, it is classified as environment-informed and excluded from the core supported claims table.
+
+### Parity Test Scope
+- **Statement**: The parity test covers policy scoring logic with identical inputs, not the live feature extraction pipeline.
 
 ### Withdrawn Claim 1: "A Single Policy Dominates Across All Retail Environments"
 - **Status**: **WITHDRAWN / UNSUPPORTED**.
 - **Explanation**:
-  - In the well-specified base environment where category affinity dominates, `Dept-Restricted LinUCB` is superior (17.9% regret share).
-  - However, under **Nonlinear Feature Interactions** (price $\times$ category sensitivity offsets and rating $\times$ discount synergies), the Department Heuristic **collapses to 71.8% regret share**.
-  - Under nonlinear choices, adaptive learning bandits like `Discounted LinUCB` (**26.6%**) and `Cold LinUCB` (**30.6%**) decisively outperform the heuristic by more than 8,000 regret points.
+  - In the well-specified base environment where category affinity dominates, `Dept-Restricted LinUCB` achieves lowest regret (17.9% regret share for m=0, 22.3% for m=2).
+  - However, under **Nonlinear Feature Interactions** (price $\times$ category sensitivity offsets and rating $\times$ discount synergies), the Department Heuristic regret share reaches **71.8%**.
+  - Under nonlinear choices, adaptive learning bandits like `Discounted LinUCB` (**26.6%**) and `Cold LinUCB` (**30.6%**) outperform the heuristic by more than 8,000 regret points.
+  - Because no single policy strictly dominates all environments, SmartCart AI exposes policy switching directly to administrators in the live Admin Dashboard.
   - Because no single policy strictly dominates all environments, SmartCart AI exposes policy switching directly to administrators in the live Admin Dashboard.
 
 ### Withdrawn Claim 2: "The Offline Retailrocket Evaluation Proves Online Customer Lift"
