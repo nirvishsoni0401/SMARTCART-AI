@@ -132,6 +132,9 @@ class LinUCBRecommender(BaseRecommender):
         self.lambda_reg = float(state.get("lambda_reg", self.lambda_reg))
         self.n_updates = int(state.get("n_updates", 0))
         self.A = np.array(state["A"], dtype=np.float64)
-        self.A_inv = np.array(state["A_inv"], dtype=np.float64)
+        if "A_inv" in state:
+            self.A_inv = np.array(state["A_inv"], dtype=np.float64)
+        else:
+            self.A_inv = np.linalg.pinv(self.A)
         self.b = np.array(state["b"], dtype=np.float64)
 

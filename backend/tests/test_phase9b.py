@@ -83,7 +83,7 @@ def test_import_waterfall_exactness():
 
     assert raw - exact_duplicates - bot_capped - tail_items == expected_imported
 
-    if HISTORICAL_DB_PATH.exists():
+    if HISTORICAL_DB_PATH.exists() and os.path.getsize(HISTORICAL_DB_PATH) > 0:
         conn = sqlite3.connect(HISTORICAL_DB_PATH)
         actual_imported = conn.cursor().execute("SELECT COUNT(*) FROM rr_events;").fetchone()[0]
         conn.close()
@@ -92,7 +92,7 @@ def test_import_waterfall_exactness():
 
 def test_transaction_preservation_safeguard():
     """Verify that all transaction events in Retailrocket were preserved."""
-    if HISTORICAL_DB_PATH.exists():
+    if HISTORICAL_DB_PATH.exists() and os.path.getsize(HISTORICAL_DB_PATH) > 0:
         conn = sqlite3.connect(HISTORICAL_DB_PATH)
         n_trans = conn.cursor().execute("SELECT COUNT(*) FROM rr_events WHERE event_type = 'transaction';").fetchone()[0]
         conn.close()
@@ -265,7 +265,7 @@ def test_ranking_metrics_toy_data():
 # =============================================================================
 def test_temporal_cutoff_leakage_control():
     """Verify that training period does not contain timestamps >= cutoff."""
-    if HISTORICAL_DB_PATH.exists():
+    if HISTORICAL_DB_PATH.exists() and os.path.getsize(HISTORICAL_DB_PATH) > 0:
         conn = sqlite3.connect(HISTORICAL_DB_PATH)
         max_ts = conn.cursor().execute("SELECT MAX(ts) FROM rr_events WHERE ts < ?;", (TRAIN_CUTOFF_MS,)).fetchone()[0]
         conn.close()

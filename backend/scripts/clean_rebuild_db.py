@@ -25,7 +25,7 @@ if str(backend_dir) not in sys.path:
 from app.config import settings
 from app.database import Base, engine, SessionLocal
 from app.models import Product, User, ProductReview, ModelState
-from app.auth import get_password_hash
+from app.auth import hash_password as get_password_hash
 from app.seed import SEED_PRODUCTS
 from scripts.import_dummyjson import run_import as import_dummyjson
 

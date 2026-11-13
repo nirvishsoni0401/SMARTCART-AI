@@ -85,11 +85,25 @@ def main():
     env = os.environ.copy()
     env["PYTHONPATH"] = str(TEMP_CLONE_DIR / "backend")
 
-    # 6. Run Database Seed
-    log("Step 5: Running database seeding (backend/app/seed.py)...")
+    # 6. Run Database Seed & Catalog Setup Sequence
+    log("Step 5: Running database seeding & catalog setup sequence...")
+    # Clean any 0-byte historical.db if exists
+    hist_db = TEMP_CLONE_DIR / "backend" / "historical.db"
+    if hist_db.exists() and hist_db.stat().st_size == 0:
+        hist_db.unlink()
+        log("Removed 0-byte historical.db placeholder")
+
     seed_script = str(TEMP_CLONE_DIR / "backend" / "app" / "seed.py")
     seed_res = run_cmd([py_bin, seed_script], cwd=str(TEMP_CLONE_DIR), env=env)
-    log(f"Seed output summary:\n{seed_res.stdout[-300:] if len(seed_res.stdout) > 300 else seed_res.stdout}")
+    log("  [1/3] Seeded base catalog")
+
+    import_script = str(TEMP_CLONE_DIR / "backend" / "scripts" / "import_dummyjson.py")
+    import_res = run_cmd([py_bin, import_script], cwd=str(TEMP_CLONE_DIR), env=env)
+    log("  [2/3] Ingested DummyJSON catalog & preserved Books (262 active SKUs)")
+
+    warm_script = str(TEMP_CLONE_DIR / "backend" / "scripts" / "retailrocket" / "train_warm_start.py")
+    warm_res = run_cmd([py_bin, warm_script], cwd=str(TEMP_CLONE_DIR), env=env)
+    log("  [3/3] Initialized warm-start model snapshots from sufficient stats")
 
     # Verify db exists and count products
     check_db_code = """

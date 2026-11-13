@@ -19,8 +19,10 @@ echo "[2/4] Installing backend dependencies..."
 python -m pip install --upgrade pip
 pip install -r backend/requirements.txt
 
-echo "[3/4] Initializing SQLite database and seeding catalog..."
+echo "[3/4] Initializing SQLite database, seeding catalog, and setting up warm snapshots..."
 python backend/app/seed.py
+python backend/scripts/import_dummyjson.py
+python backend/scripts/retailrocket/train_warm_start.py
 
 echo "[4/4] Installing frontend npm dependencies..."
 cd frontend
