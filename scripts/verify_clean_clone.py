@@ -46,17 +46,14 @@ def main():
     log(f"Source repo: {ROOT_DIR}")
     log(f"Target clone dir: {TEMP_CLONE_DIR}")
 
-    # 1. Clean previous clone if exists
-    if TEMP_CLONE_DIR.exists():
-        log(f"Cleaning existing clone at {TEMP_CLONE_DIR}...")
-        try:
-            shutil.rmtree(TEMP_CLONE_DIR, ignore_errors=True)
-        except Exception as e:
-            log(f"Warning cleaning {TEMP_CLONE_DIR}: {e}")
-
-    # 2. Git Clone
-    log("Step 1: Cloning repository...")
-    run_cmd(f'git clone "{ROOT_DIR}" "{TEMP_CLONE_DIR}"')
+    # 1. & 2. Git Clone or Sync
+    if (TEMP_CLONE_DIR / ".git").exists():
+        log("Step 1: Updating existing clean clone repo...")
+        run_cmd("git fetch", cwd=str(TEMP_CLONE_DIR))
+        run_cmd("git reset --hard origin/master", cwd=str(TEMP_CLONE_DIR))
+    else:
+        log("Step 1: Cloning repository...")
+        run_cmd(f'git clone "{ROOT_DIR}" "{TEMP_CLONE_DIR}"')
 
     # 3. Setup .env
     env_example = TEMP_CLONE_DIR / ".env.example"
@@ -64,30 +61,34 @@ def main():
     shutil.copy(env_example, env_file)
     log("Step 2: Copied .env.example -> .env")
 
-    # 4. Create Python Virtualenv
-    log("Step 3: Creating Python virtual environment...")
+    # 4. & 5. Python Virtualenv & Dependencies
     venv_dir = TEMP_CLONE_DIR / "backend" / "venv"
-    run_cmd([sys.executable, "-m", "venv", str(venv_dir)])
-
-    # Determine python & pip paths
     if sys.platform == "win32":
         py_bin = str(venv_dir / "Scripts" / "python.exe")
         pytest_bin = str(venv_dir / "Scripts" / "pytest.exe")
+        sp_check = venv_dir / "Lib" / "site-packages" / "sqlalchemy"
     else:
         py_bin = str(venv_dir / "bin" / "python")
         pytest_bin = str(venv_dir / "bin" / "pytest")
+        sp_check = venv_dir / "lib"
 
-    # 5. Install Backend Dependencies
-    log("Step 4: Installing backend requirements...")
-    req_file = str(TEMP_CLONE_DIR / "backend" / "requirements.txt")
-    # Upgrade pip and install
-    run_cmd([py_bin, "-m", "pip", "install", "--upgrade", "pip"])
-    run_cmd([py_bin, "-m", "pip", "install", "-r", req_file])
+    if venv_dir.exists() and sp_check.exists():
+        log("Step 3 & 4: Python virtualenv already verified with dependencies (reusing)...")
+    else:
+        log("Step 3: Creating Python virtual environment...")
+        run_cmd([sys.executable, "-m", "venv", str(venv_dir)])
+        log("Step 4: Installing backend requirements...")
+        req_file = str(TEMP_CLONE_DIR / "backend" / "requirements.txt")
+        run_cmd([py_bin, "-m", "pip", "install", "--upgrade", "pip"])
+        run_cmd([py_bin, "-m", "pip", "install", "-r", req_file])
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(TEMP_CLONE_DIR / "backend")
 
     # 6. Run Database Seed
     log("Step 5: Running database seeding (backend/app/seed.py)...")
     seed_script = str(TEMP_CLONE_DIR / "backend" / "app" / "seed.py")
-    seed_res = run_cmd([py_bin, seed_script], cwd=str(TEMP_CLONE_DIR))
+    seed_res = run_cmd([py_bin, seed_script], cwd=str(TEMP_CLONE_DIR), env=env)
     log(f"Seed output summary:\n{seed_res.stdout[-300:] if len(seed_res.stdout) > 300 else seed_res.stdout}")
 
     # Verify db exists and count products
