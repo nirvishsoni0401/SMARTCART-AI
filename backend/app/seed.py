@@ -1,5 +1,14 @@
+import os
+import sys
+from pathlib import Path
 import random
 from datetime import datetime, timezone
+
+# Ensure backend root is on sys.path so 'app.*' imports work from any working directory
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 from app.database import SessionLocal, init_db
 from app.models import Product, User, CartItem, WishlistItem, Order, OrderItem, InteractionEvent, RecommendationLog, ModelState
 from app.auth import hash_password
