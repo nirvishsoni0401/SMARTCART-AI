@@ -70,13 +70,23 @@
 
 ## 4. Calibration Parameters & Difficulty Noise Scales
 
-| Difficulty | Noise $\sigma$ | Random Slate CTR (%) | Oracle Slate CTR (%) | $P(\text{cart} \mid \text{click})$ (%) | $P(\text{tx} \mid \text{cart})$ (%) | Observed Purchases |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Easy** | 0.15 | 5.47% | 20.08% | 2.66% | 43.33% | 13 |
-| **Medium** | 0.40 | 5.42% | 21.43% | 2.43% | 34.48% | 10 |
-| **Hard** | 0.80 | 7.05% | 25.75% | 2.47% | 27.03% | 10 |
+| Difficulty | Noise $\sigma$ | Diagnostic Random CTR (%) | Diagnostic Oracle CTR (%) | $P(\text{cart} \mid \text{click})$ (%) | $P(\text{tx} \mid \text{cart})$ (%) | Carts (Sample Size) | Purchases |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Easy** | 0.15 | 5.47% | 20.08% | 2.66% | 43.33% | 30 | 13 |
+| **Medium** | 0.40 | 5.42% | 21.43% | 2.43% | 34.48% | 29 | 10 |
+| **Hard** | 0.80 | 7.05% | 25.75% | 2.47% | 27.03% | 37 | 10 |
 
-*Calibration Target Note*: Medium difficulty yields Random Slate CTR 5.42% (anchor target ~4.5%) and Oracle Slate CTR 21.43% (anchor target ~20.0%). The slight reduction in Oracle CTR from 20% to ~21.43% reflects strict catalog size constraints ($N=262$ SKUs across 6 departments) where top recommendations may exhaust high-affinity items.
+### Calibration Reconciliations & Benchmark CTR Parity:
+1. **Diagnostic vs Headline Horizon Saturation**:
+   The diagnostic calibration table above measures pre-drift initial saturation over a short horizon ($T = 4,000$ rounds, seed 42) without preference drift, yielding Medium Oracle CTR of 21.43% and Random CTR of 5.42%.
+   In contrast, the headline benchmark is evaluated across the full $T = 20,000$ rounds over 30 independent seeds with preference drift at $t=10,000$, yielding Medium Oracle Slate CTR of 17.39% and Random Slate CTR of 4.97%.
+2. **Sample Sizes Behind Conversion Funnel**:
+   Under medium difficulty calibration, 1193 clicks yielded 29 cart adds ($P(\text{cart} \mid \text{click}) = 2.43\%$), which subsequently converted into 10 purchases ($P(\text{tx} \mid \text{cart}) = 34.48\%$).
+3. **Random and Oracle Slate CTR by Environment Variant (30 Evaluation Seeds, Horizon 20,000)**:
+   - **Well-Specified Base**: Random CTR = 4.97% | Oracle CTR = 17.39%
+   - **Hidden Style Factor**: Random CTR = 6.05% | Oracle CTR = 31.63%
+   - **Nonlinear Interactions**: Random CTR = 6.96% | Oracle CTR = 47.84%
+   - **High Funnel Conversion**: Random CTR = 4.98% | Oracle CTR = 17.38%
 
 ### Jensen's Inequality Convexity Effect:
 On negative logit ranges (where $\beta_{\text{click}} = 5.72$ places latent utility in the negative domain), the sigmoid activation $\sigma(x) = 1 / (1 + e^{-x})$ is strictly convex. By Jensen's inequality:

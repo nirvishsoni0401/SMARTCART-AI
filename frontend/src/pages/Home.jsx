@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import RecommendationRow from '../components/RecommendationRow';
+import RecentlyViewedRow from '../components/RecentlyViewedRow';
 import { api } from '../api/client';
 
 export default function Home() {
@@ -125,6 +126,9 @@ export default function Home() {
 
       {/* Recommended For You Section (LinUCB Contextual Bandits) */}
       <RecommendationRow title="Adaptive AI Picks For You" />
+
+      {/* Recently Viewed Products (User History, Non-Bandit) */}
+      <RecentlyViewedRow title="Recently Viewed" />
 
       {/* Today's Flash Deals */}
       {deals.length > 0 && (

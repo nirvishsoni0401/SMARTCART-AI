@@ -58,7 +58,7 @@ def get_recommendations(
 
     # 2. Policy Ranking (Stage 2: score candidates using active bandit)
     scoring_start = time.perf_counter()
-    scored = model.select(candidates, top_k=min(len(candidates), limit * 3), context=None)
+    scored = model.select(candidates, top_k=min(len(candidates), limit * 3), context=context)
 
     # 3. Diversity Re-ranking (Stage 3: max per category + MMR near-duplicate penalty)
     diverse_scored = apply_diversity_reranking(
@@ -79,7 +79,8 @@ def get_recommendations(
             scored_item=item,
             context=context,
             theta=theta,
-            cold_start=is_cold_start
+            cold_start=is_cold_start,
+            algorithm=model.name
         )
 
         log_id = None

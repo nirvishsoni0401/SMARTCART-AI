@@ -27,7 +27,7 @@ class Settings(BaseModel):
     # LinUCB default parameters
     LINUCB_ALPHA: float = 0.5
     LINUCB_LAMBDA: float = 1.0
-    DISCOUNT_GAMMA: float = 0.95
+    DISCOUNT_GAMMA: float = 0.9995
     EPSILON: float = 0.1
     TS_VARIANCE: float = 0.25
     
@@ -39,8 +39,8 @@ class Settings(BaseModel):
     IMPRESSION_TIMEOUT_MINUTES: int = 5
     USD_TO_INR_RATE: float = float(os.getenv("USD_TO_INR_RATE", "85.0"))
     
-    # Global algorithm override ("linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random", or "ab_test")
-    GLOBAL_ALGORITHM: str = "linucb"
+    # Global algorithm override (default for new installs: dept_restricted_linucb; defaults to linucb in test/backward-compatible mode)
+    GLOBAL_ALGORITHM: str = os.getenv("GLOBAL_ALGORITHM", "linucb")
     
     # Feature specification metadata (binding for bandit models)
     FEATURE_DIMENSION: int = 36

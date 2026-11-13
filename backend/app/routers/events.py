@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import InteractionEvent, RecommendationLog, Product, User
-from app.schemas import EventCreate, EventOut, ImpressionBatchCreate
+from app.schemas import EventCreate, EventOut, ImpressionBatchCreate, ProductOut
 from app.auth import get_current_user_optional
 from app.config import settings
 from app.services.reward import get_reward_for_event
@@ -165,4 +165,43 @@ def record_impressions_batch(
 
     db.commit()
     return {"status": "recorded", "count": len(batch.product_ids)}
+
+
+@router.get("/recently-viewed", response_model=List[ProductOut])
+def get_recently_viewed(
+    limit: int = 10,
+    session_id: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve recently viewed items from the current user or session history.
+    Strictly hidden (returns empty list) when user tracking consent is declined.
+    Independent of the bandit recommendation slate and does not generate reward signals.
+    """
+    if current_user and not current_user.consent_tracking:
+        return []
+
+    query = db.query(InteractionEvent).filter(
+        InteractionEvent.event_type.in_(["view", "click"])
+    )
+    if current_user:
+        query = query.filter(InteractionEvent.user_id == current_user.id)
+    elif session_id:
+        query = query.filter(InteractionEvent.session_id == session_id)
+    else:
+        return []
+
+    events = query.order_by(InteractionEvent.created_at.desc()).limit(limit * 3).all()
+    seen_ids = set()
+    recent_products = []
+    for ev in events:
+        if ev.product_id not in seen_ids and ev.product:
+            seen_ids.add(ev.product_id)
+            recent_products.append(ev.product)
+            if len(recent_products) >= limit:
+                break
+
+    return recent_products
+
 

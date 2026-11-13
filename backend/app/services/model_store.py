@@ -13,6 +13,8 @@ from app.recommender.linucb_thompson import LinThompsonSamplingRecommender
 from app.recommender.epsilon_greedy import EpsilonGreedyRecommender
 from app.recommender.popularity import PopularityRecommender
 from app.recommender.random_policy import RandomRecommender
+from app.recommender.department_heuristic import DepartmentHeuristicRecommender
+from app.recommender.dept_restricted_linucb import DeptRestrictedLinUCBRecommender
 
 
 def create_fresh_models(feature_dim: int) -> Dict[str, BaseRecommender]:
@@ -22,7 +24,11 @@ def create_fresh_models(feature_dim: int) -> Dict[str, BaseRecommender]:
         "linucb_thompson": LinThompsonSamplingRecommender(feature_dim=feature_dim, v_variance=settings.TS_VARIANCE),
         "epsilon_greedy": EpsilonGreedyRecommender(feature_dim=feature_dim, epsilon=settings.EPSILON),
         "popularity": PopularityRecommender(feature_dim=feature_dim),
-        "random": RandomRecommender(feature_dim=feature_dim)
+        "random": RandomRecommender(feature_dim=feature_dim),
+        "department_heuristic": DepartmentHeuristicRecommender(feature_dim=feature_dim),
+        "dept_restricted_linucb": DeptRestrictedLinUCBRecommender(feature_dim=feature_dim, alpha=settings.LINUCB_ALPHA, lambda_reg=settings.LINUCB_LAMBDA, m_explore=2, name="dept_restricted_linucb"),
+        "dept_restricted_linucb_m0": DeptRestrictedLinUCBRecommender(feature_dim=feature_dim, alpha=settings.LINUCB_ALPHA, lambda_reg=settings.LINUCB_LAMBDA, m_explore=0, name="dept_restricted_linucb_m0"),
+        "dept_restricted_linucb_m2": DeptRestrictedLinUCBRecommender(feature_dim=feature_dim, alpha=settings.LINUCB_ALPHA, lambda_reg=settings.LINUCB_LAMBDA, m_explore=2, name="dept_restricted_linucb_m2"),
     }
 
 
@@ -127,7 +133,10 @@ class ModelStore:
     def reset_all(self, db: Optional[Session] = None, sandbox_only: bool = False) -> None:
         """Reset bandit models to uninitialized prior states (preserves snapshots)."""
         with self._lock:
-            base_names = ["linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random"]
+            base_names = [
+                "linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random",
+                "department_heuristic", "dept_restricted_linucb", "dept_restricted_linucb_m0", "dept_restricted_linucb_m2"
+            ]
             if sandbox_only:
                 self.sandbox_models = create_fresh_models(self.feature_dim)
             else:

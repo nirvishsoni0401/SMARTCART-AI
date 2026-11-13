@@ -14,6 +14,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
+import RecentlyViewedRow from '../components/RecentlyViewedRow';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { api } from '../api/client';
 
@@ -391,6 +392,9 @@ export default function ProductDetailPage() {
           </div>
         </section>
       )}
+
+      {/* Recently Viewed Products Row (User History, Non-Bandit) */}
+      <RecentlyViewedRow title="Recently Viewed" />
     </div>
   );
 }

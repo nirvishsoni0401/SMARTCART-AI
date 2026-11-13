@@ -12,7 +12,11 @@ engine = create_engine(
     echo=False
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def SessionLocal(*args, **kwargs):
+    return _SessionLocal(*args, **kwargs)
+
 Base = declarative_base()
 
 def get_db():

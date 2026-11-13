@@ -325,8 +325,11 @@ export default function AdminDashboard() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
             {[
-              { id: 'linucb', label: 'LinUCB' },
+              { id: 'dept_restricted_linucb', label: 'Dept-Restricted (m=2)' },
+              { id: 'dept_restricted_linucb_m0', label: 'Dept-Restricted (m=0)' },
+              { id: 'department_heuristic', label: 'Dept Heuristic' },
               { id: 'discounted_linucb', label: 'Discounted LinUCB' },
+              { id: 'linucb', label: 'Cold LinUCB' },
               { id: 'linucb_thompson', label: 'LinTS' },
               { id: 'epsilon_greedy', label: 'Epsilon-Greedy' },
               { id: 'popularity', label: 'Popularity' },
@@ -398,6 +401,83 @@ export default function AdminDashboard() {
               <span>Train Live</span>
             </label>
           </div>
+        </div>
+      </div>
+
+      {/* Policy Robustness Help Panel (Simulator v2 Benchmark Ground Truth) */}
+      <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Policy Robustness Across Synthetic Environments (Phase 12A-2 / 12B Ground Truth)
+            </h3>
+          </div>
+          <span className="text-[11px] font-semibold text-slate-500">
+            Regret Share % (Lower is better • 30 Seeds, T=20,000)
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+          <strong>Key Trade-Off</strong>: In the well-specified base environment, <strong>Dept-Restricted LinUCB</strong> achieves the lowest regret share (17.9%), decisively outperforming the static <strong>Department Heuristic</strong> (28.4%). However, under nonlinear customer choice interactions, the Department Heuristic collapses to <strong>71.8% regret share</strong>, whereas adaptive bandits like <strong>Discounted LinUCB</strong> (26.6%) and <strong>Cold LinUCB</strong> (30.6%) learn feature synergies and remain highly robust.
+        </p>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500">
+                <th className="py-2 font-semibold">Policy</th>
+                <th className="py-2 text-center font-semibold">Well-Specified Base</th>
+                <th className="py-2 text-center font-semibold">Hidden Style Factor</th>
+                <th className="py-2 text-center font-semibold">Nonlinear Interactions</th>
+                <th className="py-2 text-center font-semibold">High Funnel Conversion</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
+                <td className="py-2 font-bold text-indigo-600 dark:text-indigo-400">Dept-Restricted LinUCB (m=2)</td>
+                <td className="py-2 text-center font-black text-emerald-600 dark:text-emerald-400">17.9% (Best)</td>
+                <td className="py-2 text-center">48.0%</td>
+                <td className="py-2 text-center">51.6%</td>
+                <td className="py-2 text-center font-bold text-emerald-600 dark:text-emerald-400">18.6%</td>
+              </tr>
+              <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
+                <td className="py-2 font-semibold text-slate-900 dark:text-white">Residual LinUCB</td>
+                <td className="py-2 text-center font-bold">20.2%</td>
+                <td className="py-2 text-center">49.5%</td>
+                <td className="py-2 text-center">42.6%</td>
+                <td className="py-2 text-center">21.8%</td>
+              </tr>
+              <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
+                <td className="py-2 font-semibold text-slate-900 dark:text-white">Department Heuristic</td>
+                <td className="py-2 text-center">28.4%</td>
+                <td className="py-2 text-center">55.2%</td>
+                <td className="py-2 text-center font-bold text-rose-600 dark:text-rose-400">71.8% (Degrades)</td>
+                <td className="py-2 text-center">29.3%</td>
+              </tr>
+              <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
+                <td className="py-2 font-semibold text-slate-900 dark:text-white">Discounted LinUCB (gamma*=0.9995)</td>
+                <td className="py-2 text-center">32.1%</td>
+                <td className="py-2 text-center">57.0%</td>
+                <td className="py-2 text-center font-bold text-emerald-600 dark:text-emerald-400">26.6% (Best Nonlin)</td>
+                <td className="py-2 text-center">33.8%</td>
+              </tr>
+              <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
+                <td className="py-2 font-semibold text-slate-900 dark:text-white">Cold LinUCB (alpha*=0.5)</td>
+                <td className="py-2 text-center">37.5%</td>
+                <td className="py-2 text-center">60.3%</td>
+                <td className="py-2 text-center font-bold text-emerald-600 dark:text-emerald-400">30.6%</td>
+                <td className="py-2 text-center">38.0%</td>
+              </tr>
+              <tr className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
+                <td className="py-2 text-slate-500">Popularity Baseline</td>
+                <td className="py-2 text-center text-slate-500">65.7%</td>
+                <td className="py-2 text-center text-slate-500">78.4%</td>
+                <td className="py-2 text-center text-slate-500">88.9%</td>
+                <td className="py-2 text-center text-slate-500">66.8%</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 

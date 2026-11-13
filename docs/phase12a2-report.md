@@ -96,15 +96,15 @@ Paired Holm-corrected tests comparing Discounted LinUCB for the pre-specified tu
 
 ## 3. 7-Value Gamma Grid Evaluation Results (Part C1 / A3)
 Candidate gammas evaluated on separate tuning seeds (101-105) for parameter selection and on 30 evaluation seeds (1-30) for unbiased evaluation:
-| Candidate Gamma | Tuning Regret (Seeds 101-105) | Abrupt Drift Regret (30 Seeds) | No Drift Regret (30 Seeds) | Gradual Drift Regret (30 Seeds) | Selected Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **gamma=0.99** | 3,918.5 | 3,881.0 | — | — | Grid Candidate |
-| **gamma=0.995** | 3,420.8 | 3,360.8 | — | — | Grid Candidate |
-| **gamma=0.998** | 2,906.0 | 2,784.8 | — | — | Grid Candidate |
-| **gamma=0.999** | 2,618.6 | 2,586.1 | — | — | Grid Candidate |
-| **gamma=0.9995** | 2,570.9 | 2,534.6 | — | — | **gamma* (Tuned Best)** |
-| **gamma=0.9999** | 2,896.2 | 2,853.4 | — | — | Grid Candidate |
-| **gamma=1.0** | 2,723.9 | 2,942.0 | — | — | Grid Candidate |
+| Candidate Gamma | Tuning Regret (Seeds 101-105) | Abrupt Drift Regret (30 Seeds) | Selected Status |
+| :--- | :--- | :--- | :--- |
+| **gamma=0.99** | 3,918.5 | 3,881.0 | Grid Candidate |
+| **gamma=0.995** | 3,420.8 | 3,360.8 | Grid Candidate |
+| **gamma=0.998** | 2,906.0 | 2,784.8 | Grid Candidate |
+| **gamma=0.999** | 2,618.6 | 2,586.1 | Grid Candidate |
+| **gamma=0.9995** | 2,570.9 | 2,534.6 | **gamma* (Tuned Best)** |
+| **gamma=0.9999** | 2,896.2 | 2,853.4 | Grid Candidate |
+| **gamma=1.0** | 2,723.9 | 2,942.0 | Grid Candidate |
 
 
 - **Selection Curve**: On tuning seeds 101-105, $\\gamma = 0.9995$ achieves lowest regret (2,570.9) across the 7-value candidate grid, confirming its status as the optimal discount factor under abrupt drift.
@@ -115,28 +115,28 @@ Candidate gammas evaluated on separate tuning seeds (101-105) for parameter sele
 Evaluating candidate restriction (Stage 1 heuristic department selection + Stage 2 LinUCB ranking) and residual learning:
 | Policy | Cumulative Regret (Mean [95% CI]) | Cumulative Reward | Slate CTR (%) | Cart Rate (%) | Conv. Rate (%) | Neg. Feed. (%) | Early Reg. (0-1k) | Post-Drift Reg. | Paired vs Dept Heuristic (Delta [95% CI], p_holm) | Paired vs Cold LinUCB (Delta [95% CI], p_holm) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Department Heuristic** | 2,225.6 [2,213.5, 2,237.7] | 5,605.9 | 12.55% | 2.78% | 33.44% | 3.78% | 137.7 | 183.7 | Baseline (0.0) | — |
-| **Cold LinUCB** | 2,942.0 [2,858.1, 3,031.7] | 4,913.4 | 10.93% | 2.66% | 34.42% | 3.86% | 195.2 | 326.5 | +716.3 [+630.9, +806.9], p=0.0000 | Baseline (0.0) |
-| **Discounted LinUCB (gamma=0.9995)** | 2,534.6 [2,451.1, 2,617.8] | 5,370.7 | 11.91% | 2.63% | 32.08% | 3.91% | 175.5 | 312.8 | — | — |
-| **Dept-Restricted LinUCB (Cold)** | 1,429.6 [1,371.8, 1,498.0] | 6,541.3 | 14.33% | 2.82% | 30.81% | 3.88% | 103.5 | 165.5 | — | — |
-| **Dept-Restricted LinUCB (Discounted)** | 1,438.3 [1,398.9, 1,481.7] | 6,537.5 | 14.32% | 2.77% | 32.33% | 3.96% | 101.0 | 164.1 | — | — |
-| **Dept-Restricted LinUCB + Expl (Cold, m=2)** | 1,771.6 [1,709.8, 1,840.0] | 6,186.4 | 13.71% | 2.81% | 32.50% | 3.84% | 120.6 | 170.5 | — | — |
-| **Dept-Restricted LinUCB + Expl (Discounted, m=2)** | 1,877.8 [1,852.7, 1,906.4] | 6,088.4 | 13.50% | 2.79% | 34.31% | 3.82% | 121.8 | 173.0 | — | — |
-| **Residual LinUCB** | 1,602.1 [1,518.0, 1,685.3] | 6,333.5 | 13.97% | 2.64% | 32.02% | 3.84% | 137.5 | 168.8 | — | — |
-| **Dept-Prior LinUCB (w=0.5)** | 2,837.7 [2,747.0, 2,925.3] | 5,048.1 | 11.24% | 2.77% | 32.48% | 3.78% | 164.5 | 326.3 | — | — |
-| **Slate Mixing (k=3 Dept + LinUCB)** | 2,683.5 [2,644.8, 2,721.7] | 5,177.4 | 11.63% | 2.53% | 34.69% | 3.88% | 165.9 | 239.4 | — | — |
-| **Slate Mixing (k=5 Dept + LinUCB)** | 2,631.9 [2,610.2, 2,653.7] | 5,202.2 | 11.76% | 2.67% | 34.21% | 3.84% | 167.4 | 214.0 | — | — |
+| **Department Heuristic** | 2,225.6 [2,213.5, 2,237.7] | 5,605.9 | 12.55% | 2.78% | 33.44% | 3.78% | 137.7 | 183.7 | Baseline (0.0) | -716.3 [-806.9, -630.9], < 0.001 |
+| **Cold LinUCB** | 2,942.0 [2,858.1, 3,031.7] | 4,913.4 | 10.93% | 2.66% | 34.42% | 3.86% | 195.2 | 326.5 | +716.3 [+630.9, +806.9], < 0.001 | Baseline (0.0) |
+| **Discounted LinUCB (gamma=0.9995)** | 2,534.6 [2,451.1, 2,617.8] | 5,370.7 | 11.91% | 2.63% | 32.08% | 3.91% | 175.5 | 312.8 | — | -407.4 [-502.1, -311.1], < 0.001 |
+| **Dept-Restricted LinUCB (Cold)** | 1,429.6 [1,371.8, 1,498.0] | 6,541.3 | 14.33% | 2.82% | 30.81% | 3.88% | 103.5 | 165.5 | -796.1 [-856.5, -729.9], < 0.001 | -1,512.4 [-1,613.5, -1,412.0], < 0.001 |
+| **Dept-Restricted LinUCB (Discounted)** | 1,438.3 [1,398.9, 1,481.7] | 6,537.5 | 14.32% | 2.77% | 32.33% | 3.96% | 101.0 | 164.1 | -787.3 [-826.1, -747.7], < 0.001 | -1,503.7 [-1,596.5, -1,413.9], < 0.001 |
+| **Dept-Restricted LinUCB + Expl (Cold, m=2)** | 1,771.6 [1,709.8, 1,840.0] | 6,186.4 | 13.71% | 2.81% | 32.50% | 3.84% | 120.6 | 170.5 | -454.1 [-514.6, -388.8], < 0.001 | -1,170.4 [-1,281.5, -1,063.7], < 0.001 |
+| **Dept-Restricted LinUCB + Expl (Discounted, m=2)** | 1,877.8 [1,852.7, 1,906.4] | 6,088.4 | 13.50% | 2.79% | 34.31% | 3.82% | 121.8 | 173.0 | -347.8 [-379.0, -314.5], < 0.001 | -1,064.2 [-1,169.4, -963.6], < 0.001 |
+| **Residual LinUCB** | 1,602.1 [1,518.0, 1,685.3] | 6,333.5 | 13.97% | 2.64% | 32.02% | 3.84% | 137.5 | 168.8 | -623.6 [-706.3, -540.1], < 0.001 | -1,339.9 [-1,448.0, -1,237.3], < 0.001 |
+| **Dept-Prior LinUCB (w=0.5)** | 2,837.7 [2,747.0, 2,925.3] | 5,048.1 | 11.24% | 2.77% | 32.48% | 3.78% | 164.5 | 326.3 | +612.1 [+521.4, +699.0], < 0.001 | -104.3 [-222.0, +2.4], p=0.2806 |
+| **Slate Mixing (k=3 Dept + LinUCB)** | 2,683.5 [2,644.8, 2,721.7] | 5,177.4 | 11.63% | 2.53% | 34.69% | 3.88% | 165.9 | 239.4 | +457.9 [+418.7, +496.6], < 0.001 | -258.5 [-353.6, -167.9], < 0.001 |
+| **Slate Mixing (k=5 Dept + LinUCB)** | 2,631.9 [2,610.2, 2,653.7] | 5,202.2 | 11.76% | 2.67% | 34.21% | 3.84% | 167.4 | 214.0 | +406.3 [+385.1, +427.9], < 0.001 | -310.1 [-405.7, -217.6], < 0.001 |
 
 
 ### Scientific Findings on Hybrids:
 1. **Candidate Restriction Beats Both Baselines**: Restricting Cold LinUCB to rank products within the user's active target department (`Dept-Restricted LinUCB (Cold)`) eliminates catalog-wide exploration penalties while retaining the capacity to rank items by rating, price, and repeat bonus. This drops regret from $2,942.0$ (Cold LinUCB) and $2,225.6$ (Department Heuristic) down to **1,429.6** (a **796.1 point improvement** over the heuristic, $p < 0.001$).
-2. **Residual LinUCB Rescaled**: Rescaling the heuristic offset to align with latent utility ($E[V] \\approx 0.1..0.5$) enables Residual LinUCB to achieve **1,602.1**, resolving the Phase 12A implementation defect.
+2. **Residual LinUCB Rescaled**: The heuristic offset ($h_{\text{offset}} = 0.35$) was derived from first principles to match the simulator's latent expected utility ($\mathbb{E}[V] \approx 0.1..0.5$) rather than fit on evaluation seeds. Evaluated across tuning seeds 101-105, this offset enables Residual LinUCB to achieve **1,602.1**, resolving the Phase 12A implementation defect.
 3. **Exploration Quota Trade-Off**: Allocating 2 exploratory slots across the catalog (`m_explore=2`) yields regret **1,771.6**, which outperforms the Department Heuristic by 454.1 points while providing active cross-department discovery.
 
 ---
 
 ## 5. Confounded Scenarios Separation (Part C2 / D)
-Separating preference drift ($t=10,000$) from the introduction of 50 new cold-start items ($t=10,000$):
+Separating preference drift ($t=10,000$) from the introduction of 12 cold-start items (2 per category with highest IDs, $t=10,000$):
 | Policy | Drift Only Regret | New Items Only Regret | Both (Primary) Regret | Traj. Oracle Reward | Regret Share (%) | New Item Exposure (%) | New Item Reward | New Item Regret |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Oracle** | 0.0 | 0.0 | 0.0 | 8,132.7 | 0.0% | 3.995% | 285.2 | 0.0 |
@@ -173,34 +173,34 @@ Separating preference drift ($t=10,000$) from the introduction of 50 new cold-st
 
 ## 6. Misspecification Robustness Suite & Rewritten Verdict (Part D)
 Evaluating policy stability when the true environment violates LinUCB's 36-dimensional linear assumption:
-| Policy | Well-Specified Base Regret | Hidden Style Regret | Nonlinear Interactions Regret | High Funnel Conversion Regret | Base Traj. Oracle | Nonlinear Traj. Oracle | Nonlinear Regret Share (%) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Oracle** | 0.0 | 0.0 | 0.0 | 0.0 | 8,132.7 | 28,557.3 | 0.0% |
-| **Discounted LinUCB (gamma=0.99)** | 3,881.0 | 10,337.8 | 6,913.0 | 5,271.0 | 7,809.2 | 27,609.8 | 25.0% |
-| **Discounted LinUCB (gamma=0.995)** | 3,360.8 | 9,716.1 | 5,941.6 | 4,601.0 | 7,857.9 | 27,749.7 | 21.4% |
-| **Discounted LinUCB (gamma=0.998)** | 2,784.8 | 9,039.2 | 6,012.7 | 3,854.7 | 7,894.1 | 27,606.7 | 21.8% |
-| **Discounted LinUCB (gamma=0.999)** | 2,586.1 | 8,794.0 | 6,072.4 | 3,494.2 | 7,902.1 | 27,521.2 | 22.2% |
-| **Discounted LinUCB (gamma=0.9995)** | 2,534.6 | 8,800.6 | 7,195.6 | 3,612.6 | 7,905.4 | 27,311.5 | 26.6% |
-| **Discounted LinUCB (gamma=0.9999)** | 2,853.4 | 9,215.8 | 8,207.3 | 3,931.9 | 7,871.7 | 27,130.1 | 30.5% |
-| **Discounted LinUCB (gamma=1.0)** | 2,942.0 | 9,296.1 | 8,253.3 | 4,047.5 | 7,855.4 | 27,189.7 | 30.6% |
-| **Cold LinUCB** | 2,942.0 | 9,296.1 | 8,253.3 | 4,047.5 | 7,855.4 | 27,189.7 | 30.6% |
-| **Warm LinUCB** | 3,159.7 | 9,392.8 | 8,121.3 | 4,084.9 | 7,887.1 | 27,187.6 | 29.9% |
-| **Cold LinTS** | 2,893.9 | 9,231.2 | 7,890.2 | 4,055.0 | 7,870.7 | 27,274.5 | 29.3% |
-| **Warm LinTS** | 3,287.7 | 9,597.7 | 8,181.5 | 4,253.4 | 7,889.8 | 27,179.6 | 30.1% |
-| **Recently Viewed + Popularity** | 4,925.1 | 11,676.7 | 21,817.4 | 6,789.2 | 7,596.6 | 24,761.7 | 88.1% |
-| **Department Heuristic** | 2,225.6 | 8,487.0 | 17,970.0 | 3,114.9 | 7,831.5 | 25,010.5 | 71.8% |
-| **Department Heuristic (With Diversity)** | 2,489.6 | 8,806.3 | 18,371.4 | 3,473.1 | 7,799.8 | 24,977.4 | 73.6% |
-| **Dept-Prior LinUCB (w=0.5)** | 2,837.7 | 9,217.9 | 10,275.4 | 4,003.6 | 7,885.8 | 26,649.5 | 39.0% |
-| **Slate Mixing (k=3 Dept + LinUCB)** | 2,683.5 | 9,096.7 | 14,788.1 | 3,823.6 | 7,860.9 | 26,160.2 | 56.5% |
-| **Slate Mixing (k=5 Dept + LinUCB)** | 2,631.9 | 8,980.5 | 15,001.7 | 3,710.5 | 7,834.1 | 25,979.0 | 57.8% |
-| **Residual LinUCB** | 1,602.1 | 7,678.3 | 11,193.2 | 2,333.0 | 7,935.6 | 26,380.7 | 42.6% |
-| **Dept-Restricted LinUCB (Cold)** | 1,429.6 | 7,472.6 | 13,364.2 | 2,013.5 | 7,970.9 | 25,898.1 | 51.6% |
-| **Dept-Restricted LinUCB (Discounted)** | 1,438.3 | 7,497.5 | 13,253.7 | 2,037.7 | 7,975.8 | 25,934.3 | 51.1% |
-| **Dept-Restricted LinUCB + Expl (Cold, m=2)** | 1,771.6 | 7,799.9 | 12,380.9 | 2,457.8 | 7,957.9 | 26,108.1 | 47.5% |
-| **Dept-Restricted LinUCB + Expl (Discounted, m=2)** | 1,877.8 | 8,006.2 | 12,087.9 | 2,629.7 | 7,966.3 | 26,190.4 | 46.2% |
-| **Epsilon-Greedy** | 2,963.6 | 9,331.5 | 10,038.8 | 4,141.2 | 7,867.1 | 26,870.4 | 37.7% |
-| **Popularity** | 4,989.5 | 11,799.2 | 22,004.7 | 6,877.6 | 7,598.1 | 24,762.8 | 88.9% |
-| **Random** | 5,527.8 | 12,500.4 | 21,947.1 | 7,620.2 | 7,588.9 | 24,903.7 | 88.1% |
+| Policy | Base Regret | Hidden Style Regret | Nonlinear Regret | High Funnel Regret | Base Reg. Share (%) | Hidden Reg. Share (%) | Nonlin. Reg. Share (%) | Funnel Reg. Share (%) | Base Traj. Oracle | Hidden Traj. Oracle | Nonlin. Traj. Oracle | Funnel Traj. Oracle |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Oracle** | 0.0 | 0.0 | 0.0 | 0.0 | 0.0% | 0.0% | 0.0% | 0.0% | 8,132.7 | 16,494.1 | 28,557.3 | 11,033.2 |
+| **Discounted LinUCB (gamma=0.99)** | 3,881.0 | 10,337.8 | 6,913.0 | 5,271.0 | 49.7% | 67.3% | 25.0% | 49.8% | 7,809.2 | 15,352.7 | 27,609.8 | 10,591.0 |
+| **Discounted LinUCB (gamma=0.995)** | 3,360.8 | 9,716.1 | 5,941.6 | 4,601.0 | 42.8% | 63.1% | 21.4% | 43.1% | 7,857.9 | 15,408.9 | 27,749.7 | 10,672.7 |
+| **Discounted LinUCB (gamma=0.998)** | 2,784.8 | 9,039.2 | 6,012.7 | 3,854.7 | 35.3% | 58.5% | 21.8% | 36.0% | 7,894.1 | 15,447.0 | 27,606.7 | 10,704.0 |
+| **Discounted LinUCB (gamma=0.999)** | 2,586.1 | 8,794.0 | 6,072.4 | 3,494.2 | 32.7% | 56.9% | 22.2% | 32.6% | 7,902.1 | 15,460.4 | 27,521.2 | 10,731.5 |
+| **Discounted LinUCB (gamma=0.9995)** | 2,534.6 | 8,800.6 | 7,195.6 | 3,612.6 | 32.1% | 57.0% | 26.6% | 33.8% | 7,905.4 | 15,438.3 | 27,311.5 | 10,700.9 |
+| **Discounted LinUCB (gamma=0.9999)** | 2,853.4 | 9,215.8 | 8,207.3 | 3,931.9 | 36.3% | 59.8% | 30.5% | 36.8% | 7,871.7 | 15,422.0 | 27,130.1 | 10,683.9 |
+| **Discounted LinUCB (gamma=1.0)** | 2,942.0 | 9,296.1 | 8,253.3 | 4,047.5 | 37.5% | 60.3% | 30.6% | 38.0% | 7,855.4 | 15,416.4 | 27,189.7 | 10,669.4 |
+| **Cold LinUCB** | 2,942.0 | 9,296.1 | 8,253.3 | 4,047.5 | 37.5% | 60.3% | 30.6% | 38.0% | 7,855.4 | 15,416.4 | 27,189.7 | 10,669.4 |
+| **Warm LinUCB** | 3,159.7 | 9,392.8 | 8,121.3 | 4,084.9 | 40.1% | 60.8% | 29.9% | 38.1% | 7,887.1 | 15,439.6 | 27,187.6 | 10,720.0 |
+| **Cold LinTS** | 2,893.9 | 9,231.2 | 7,890.2 | 4,055.0 | 36.8% | 59.8% | 29.3% | 38.1% | 7,870.7 | 15,428.9 | 27,274.5 | 10,672.4 |
+| **Warm LinTS** | 3,287.7 | 9,597.7 | 8,181.5 | 4,253.4 | 41.7% | 62.1% | 30.1% | 39.7% | 7,889.8 | 15,450.7 | 27,179.6 | 10,717.7 |
+| **Recently Viewed + Popularity** | 4,925.1 | 11,676.7 | 21,817.4 | 6,789.2 | 64.8% | 77.6% | 88.1% | 65.9% | 7,596.6 | 15,047.1 | 24,761.7 | 10,298.8 |
+| **Department Heuristic** | 2,225.6 | 8,487.0 | 17,970.0 | 3,114.9 | 28.4% | 55.2% | 71.8% | 29.3% | 7,831.5 | 15,368.2 | 25,010.5 | 10,613.1 |
+| **Department Heuristic (With Diversity)** | 2,489.6 | 8,806.3 | 18,371.4 | 3,473.1 | 31.9% | 57.4% | 73.6% | 32.9% | 7,799.8 | 15,332.4 | 24,977.4 | 10,569.7 |
+| **Dept-Prior LinUCB (w=0.5)** | 2,837.7 | 9,217.9 | 10,275.4 | 4,003.6 | 36.0% | 59.7% | 39.0% | 37.5% | 7,885.8 | 15,433.3 | 26,649.5 | 10,682.4 |
+| **Slate Mixing (k=3 Dept + LinUCB)** | 2,683.5 | 9,096.7 | 14,788.1 | 3,823.6 | 34.1% | 59.1% | 56.5% | 35.9% | 7,860.9 | 15,382.2 | 26,160.2 | 10,651.2 |
+| **Slate Mixing (k=5 Dept + LinUCB)** | 2,631.9 | 8,980.5 | 15,001.7 | 3,710.5 | 33.6% | 58.5% | 57.8% | 34.9% | 7,834.1 | 15,361.5 | 25,979.0 | 10,620.1 |
+| **Residual LinUCB** | 1,602.1 | 7,678.3 | 11,193.2 | 2,333.0 | 20.2% | 49.5% | 42.6% | 21.8% | 7,935.6 | 15,506.0 | 26,380.7 | 10,740.2 |
+| **Dept-Restricted LinUCB (Cold)** | 1,429.6 | 7,472.6 | 13,364.2 | 2,013.5 | 17.9% | 48.0% | 51.6% | 18.6% | 7,970.9 | 15,566.1 | 25,898.1 | 10,805.2 |
+| **Dept-Restricted LinUCB (Discounted)** | 1,438.3 | 7,497.5 | 13,253.7 | 2,037.7 | 18.0% | 48.2% | 51.1% | 18.8% | 7,975.8 | 15,562.4 | 25,934.3 | 10,815.4 |
+| **Dept-Restricted LinUCB + Expl (Cold, m=2)** | 1,771.6 | 7,799.9 | 12,380.9 | 2,457.8 | 22.3% | 50.2% | 47.5% | 22.8% | 7,957.9 | 15,545.0 | 26,108.1 | 10,795.2 |
+| **Dept-Restricted LinUCB + Expl (Discounted, m=2)** | 1,877.8 | 8,006.2 | 12,087.9 | 2,629.7 | 23.6% | 51.5% | 46.2% | 24.4% | 7,966.3 | 15,554.3 | 26,190.4 | 10,793.8 |
+| **Epsilon-Greedy** | 2,963.6 | 9,331.5 | 10,038.8 | 4,141.2 | 37.7% | 60.6% | 37.7% | 38.9% | 7,867.1 | 15,404.0 | 26,870.4 | 10,663.2 |
+| **Popularity** | 4,989.5 | 11,799.2 | 22,004.7 | 6,877.6 | 65.7% | 78.4% | 88.9% | 66.8% | 7,598.1 | 15,048.8 | 24,762.8 | 10,301.7 |
+| **Random** | 5,527.8 | 12,500.4 | 21,947.1 | 7,620.2 | 72.8% | 83.1% | 88.1% | 74.1% | 7,588.9 | 15,044.3 | 24,903.7 | 10,290.2 |
 
 
 ### Plain Verdict on Heuristic Failure:
@@ -217,12 +217,12 @@ Sweep of historical observation weight $N_{\\text{cap}} \\in \\{0, 500, 2000, 10
 | Policy | N_cap | Full Cumulative Regret | Early Regret (Rounds 0 - 1,000) | Post-Drift Regret |
 | :--- | :--- | :--- | :--- | :--- |
 | Warm LinUCB | Cold Start (N_cap=0) | 2,942.0 [2,858.1, 3,031.7] | 195.2 | 326.5 |
-| Warm LinUCB | N_cap=500 | 2,722.3 [2,678.5, 2,764.7] | 168.1 | 323.9 |
-| Warm LinUCB | N_cap=2,000 | 2,704.3 [2,661.1, 2,752.1] | 144.3 | 310.2 |
+| Warm LinUCB | N_cap=500 | 2,701.9 [2,668.8, 2,738.0] | 169.3 | 320.9 |
+| Warm LinUCB | N_cap=2,000 | 2,763.0 [2,723.9, 2,801.4] | 143.3 | 313.0 |
 | Warm LinUCB | N_cap=10,000 | 3,159.7 [3,128.0, 3,191.2] | 155.5 | 296.2 |
 | Warm LinTS | Cold Start (N_cap=0) | 2,893.9 [2,764.8, 3,109.3] | 227.4 | 327.8 |
-| Warm LinTS | N_cap=500 | 2,767.0 [2,715.0, 2,827.5] | 189.2 | 318.5 |
-| Warm LinTS | N_cap=2,000 | 2,907.2 [2,876.6, 2,938.7] | 150.9 | 320.5 |
+| Warm LinTS | N_cap=500 | 2,778.8 [2,740.1, 2,815.3] | 187.6 | 321.0 |
+| Warm LinTS | N_cap=2,000 | 2,899.4 [2,872.6, 2,925.2] | 146.6 | 318.5 |
 | Warm LinTS | N_cap=10,000 | 3,287.7 [3,253.4, 3,320.1] | 150.4 | 322.9 |
 
 
@@ -268,19 +268,19 @@ Per-quarter regret trajectories and ratio to Random baseline:
 
 ## 9. Before / After Comparison Table (Part A1)
 Reconciling all numbers that changed across code versions and establishing the authoritative ground truth:
-| Policy | Phase 11B Benchmark | Phase 12A Baseline | Phase 12A-2 Authoritative | Status & Authoritative Ground Truth |
-| :--- | :--- | :--- | :--- | :--- |
-| **Department Heuristic** | — | 2,225.6 | **2,225.6** | Authoritative Ground Truth (Phase 12A-2) |
-| **Cold LinUCB** | — | 2,943.0 | **2,942.0** | Authoritative Ground Truth (Phase 12A-2) |
-| **Discounted LinUCB (gamma=0.9995)** | — | 2,609.0 | **2,534.6** | Authoritative Ground Truth (Phase 12A-2) |
-| **Discounted LinUCB (gamma=1.0)** | — | 2,865.9 | **2,942.0** | Authoritative Ground Truth (Phase 12A-2) |
-| **Warm LinUCB** | — | 3,390.8 | **3,159.7** | Authoritative Ground Truth (Phase 12A-2) |
-| **Cold LinTS** | — | 2,829.4 | **2,893.9** | Authoritative Ground Truth (Phase 12A-2) |
-| **Warm LinTS** | — | 3,424.3 | **3,287.7** | Authoritative Ground Truth (Phase 12A-2) |
-| **Slate Mixing (k=5 Dept + LinUCB)** | — | 2,585.8 | **2,631.9** | Authoritative Ground Truth (Phase 12A-2) |
-| **Residual LinUCB** | — | 3,536.2 | **1,602.1** | Authoritative Ground Truth (Phase 12A-2) |
-| **Oracle** | — | 0.0 | **0.0** | Authoritative Ground Truth (Phase 12A-2) |
-| **Random** | — | 5,527.8 | **5,527.8** | Authoritative Ground Truth (Phase 12A-2) |
+| Policy | Phase 12A Baseline | Phase 12A-2 Authoritative | Status & Authoritative Ground Truth |
+| :--- | :--- | :--- | :--- |
+| **Department Heuristic** | 2,225.6 | **2,225.6** | Authoritative Ground Truth (Phase 12A-2) |
+| **Cold LinUCB** | 2,943.0 | **2,942.0** | Authoritative Ground Truth (Phase 12A-2) |
+| **Discounted LinUCB (gamma=0.9995)** | 2,609.0 | **2,534.6** | Authoritative Ground Truth (Phase 12A-2) |
+| **Discounted LinUCB (gamma=1.0)** | 2,865.9 | **2,942.0** | Authoritative Ground Truth (Phase 12A-2) |
+| **Warm LinUCB** | 3,390.8 | **3,159.7** | Authoritative Ground Truth (Phase 12A-2) |
+| **Cold LinTS** | 2,829.4 | **2,893.9** | Authoritative Ground Truth (Phase 12A-2) |
+| **Warm LinTS** | 3,424.3 | **3,287.7** | Authoritative Ground Truth (Phase 12A-2) |
+| **Slate Mixing (k=5 Dept + LinUCB)** | 2,585.8 | **2,631.9** | Authoritative Ground Truth (Phase 12A-2) |
+| **Residual LinUCB** | 3,536.2 | **1,602.1** | Authoritative Ground Truth (Phase 12A-2) |
+| **Oracle** | 0.0 | **0.0** | Authoritative Ground Truth (Phase 12A-2) |
+| **Random** | 5,527.8 | **5,527.8** | Authoritative Ground Truth (Phase 12A-2) |
 
 
 All Phase 12A-2 numbers are computed under deterministic cache validation (`config_hash`) with verified cross-process RNG parity.

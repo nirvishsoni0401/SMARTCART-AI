@@ -337,13 +337,23 @@ def generate_assumption_card(results: Dict[str, Any]):
 
 ## 4. Calibration Parameters & Difficulty Noise Scales
 
-| Difficulty | Noise $\\sigma$ | Random Slate CTR (%) | Oracle Slate CTR (%) | $P(\\text{{cart}} \\mid \\text{{click}})$ (%) | $P(\\text{{tx}} \\mid \\text{{cart}})$ (%) | Observed Purchases |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Easy** | {cal_easy['sigma']:.2f} | {cal_easy['random_slate_ctr']*100:.2f}% | {cal_easy['oracle_slate_ctr']*100:.2f}% | {cal_easy['cart_rate']*100:.2f}% | {cal_easy['conversion_rate']*100:.2f}% | {cal_easy['event_counts']['purchase']} |
-| **Medium** | {cal_med['sigma']:.2f} | {cal_med['random_slate_ctr']*100:.2f}% | {cal_med['oracle_slate_ctr']*100:.2f}% | {cal_med['cart_rate']*100:.2f}% | {cal_med['conversion_rate']*100:.2f}% | {cal_med['event_counts']['purchase']} |
-| **Hard** | {cal_hard['sigma']:.2f} | {cal_hard['random_slate_ctr']*100:.2f}% | {cal_hard['oracle_slate_ctr']*100:.2f}% | {cal_hard['cart_rate']*100:.2f}% | {cal_hard['conversion_rate']*100:.2f}% | {cal_hard['event_counts']['purchase']} |
+| Difficulty | Noise $\\sigma$ | Diagnostic Random CTR (%) | Diagnostic Oracle CTR (%) | $P(\\text{{cart}} \\mid \\text{{click}})$ (%) | $P(\\text{{tx}} \\mid \\text{{cart}})$ (%) | Carts (Sample Size) | Purchases |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Easy** | {cal_easy['sigma']:.2f} | {cal_easy['random_slate_ctr']*100:.2f}% | {cal_easy['oracle_slate_ctr']*100:.2f}% | {cal_easy['cart_rate']*100:.2f}% | {cal_easy['conversion_rate']*100:.2f}% | {cal_easy['event_counts']['cart_add']} | {cal_easy['event_counts']['purchase']} |
+| **Medium** | {cal_med['sigma']:.2f} | {cal_med['random_slate_ctr']*100:.2f}% | {cal_med['oracle_slate_ctr']*100:.2f}% | {cal_med['cart_rate']*100:.2f}% | {cal_med['conversion_rate']*100:.2f}% | {cal_med['event_counts']['cart_add']} | {cal_med['event_counts']['purchase']} |
+| **Hard** | {cal_hard['sigma']:.2f} | {cal_hard['random_slate_ctr']*100:.2f}% | {cal_hard['oracle_slate_ctr']*100:.2f}% | {cal_hard['cart_rate']*100:.2f}% | {cal_hard['conversion_rate']*100:.2f}% | {cal_hard['event_counts']['cart_add']} | {cal_hard['event_counts']['purchase']} |
 
-*Calibration Target Note*: Medium difficulty yields Random Slate CTR {cal_med['random_slate_ctr']*100:.2f}% (anchor target ~4.5%) and Oracle Slate CTR {cal_med['oracle_slate_ctr']*100:.2f}% (anchor target ~20.0%). The slight reduction in Oracle CTR from 20% to ~{cal_med['oracle_slate_ctr']*100:.2f}% reflects strict catalog size constraints ($N=262$ SKUs across 6 departments) where top recommendations may exhaust high-affinity items.
+### Calibration Reconciliations & Benchmark CTR Parity:
+1. **Diagnostic vs Headline Horizon Saturation**:
+   The diagnostic calibration table above measures pre-drift initial saturation over a short horizon ($T = 4,000$ rounds, seed 42) without preference drift, yielding Medium Oracle CTR of {cal_med['oracle_slate_ctr']*100:.2f}% and Random CTR of {cal_med['random_slate_ctr']*100:.2f}%.
+   In contrast, the headline benchmark is evaluated across the full $T = 20,000$ rounds over 30 independent seeds with preference drift at $t=10,000$, yielding Medium Oracle Slate CTR of {primary['Oracle']['slate_ctr']['mean']*100:.2f}% and Random Slate CTR of {primary['Random']['slate_ctr']['mean']*100:.2f}%.
+2. **Sample Sizes Behind Conversion Funnel**:
+   Under medium difficulty calibration, {cal_med['event_counts']['click']} clicks yielded {cal_med['event_counts']['cart_add']} cart adds ($P(\\text{{cart}} \\mid \\text{{click}}) = {cal_med['cart_rate']*100:.2f}\\%$), which subsequently converted into {cal_med['event_counts']['purchase']} purchases ($P(\\text{{tx}} \\mid \\text{{cart}}) = {cal_med['conversion_rate']*100:.2f}\\%$).
+3. **Random and Oracle Slate CTR by Environment Variant (30 Evaluation Seeds, Horizon 20,000)**:
+   - **Well-Specified Base**: Random CTR = {primary['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {primary['Oracle']['slate_ctr']['mean']*100:.2f}%
+   - **Hidden Style Factor**: Random CTR = {results['misspecification_robustness']['hidden_style']['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {results['misspecification_robustness']['hidden_style']['Oracle']['slate_ctr']['mean']*100:.2f}%
+   - **Nonlinear Interactions**: Random CTR = {results['misspecification_robustness']['nonlinear_interactions']['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {results['misspecification_robustness']['nonlinear_interactions']['Oracle']['slate_ctr']['mean']*100:.2f}%
+   - **High Funnel Conversion**: Random CTR = {results['misspecification_robustness']['high_funnel_conversion']['Random']['slate_ctr']['mean']*100:.2f}% | Oracle CTR = {results['misspecification_robustness']['high_funnel_conversion']['Oracle']['slate_ctr']['mean']*100:.2f}%
 
 ### Jensen's Inequality Convexity Effect:
 On negative logit ranges (where $\\beta_{{\\text{{click}}}} = 5.72$ places latent utility in the negative domain), the sigmoid activation $\\sigma(x) = 1 / (1 + e^{{-x}})$ is strictly convex. By Jensen's inequality:
@@ -424,8 +434,8 @@ def generate_benchmark_report(results: Dict[str, Any]):
                 table_a1 += f"| {item['comparison']} | {scen_name} | {item['horizon_description']} | {item['mean_diff']:,.1f} | {ci_str} | {item['cohen_d']:.3f} | {p_raw} | {p_holm} | {item['verdict']} |\n"
 
     # Table 3: 7-Value Gamma Grid Evaluation Results
-    table_gamma = """| Candidate Gamma | Tuning Regret (Seeds 101-105) | Abrupt Drift Regret (30 Seeds) | No Drift Regret (30 Seeds) | Gradual Drift Regret (30 Seeds) | Selected Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
+    table_gamma = """| Candidate Gamma | Tuning Regret (Seeds 101-105) | Abrupt Drift Regret (30 Seeds) | Selected Status |
+| :--- | :--- | :--- | :--- |
 """
     tuning_gammas = results["hyperparameter_tuning"].get("gamma_sweep", {})
     best_gamma_val = results["hyperparameter_tuning"].get("best_gamma", 0.9995)
@@ -434,10 +444,8 @@ def generate_benchmark_report(results: Dict[str, Any]):
         t_reg = f"{tuning_gammas.get(g_str, 0.0):,.1f}" if g_str in tuning_gammas else "—"
         pol_cand = f"Discounted LinUCB (gamma={g_cand})"
         abr_reg = f"{primary[pol_cand]['cumulative_regret']['mean']:,.1f}" if pol_cand in primary else "—"
-        nd_reg = f"{gamma_eval.get('no_drift', {}).get(g_str, {}).get('cumulative_regret', {}).get('mean', 0.0):,.1f}" if g_str in gamma_eval.get('no_drift', {}) else "—"
-        gd_reg = f"{gamma_eval.get('gradual_drift', {}).get(g_str, {}).get('cumulative_regret', {}).get('mean', 0.0):,.1f}" if g_str in gamma_eval.get('gradual_drift', {}) else "—"
         status = "**gamma* (Tuned Best)**" if g_cand == best_gamma_val else "Grid Candidate"
-        table_gamma += f"| **gamma={g_cand}** | {t_reg} | {abr_reg} | {nd_reg} | {gd_reg} | {status} |\n"
+        table_gamma += f"| **gamma={g_cand}** | {t_reg} | {abr_reg} | {status} |\n"
 
     # Table 4: Two-Stage Hybrids & Candidate Restriction
     table_hybrids = """| Policy | Cumulative Regret (Mean [95% CI]) | Cumulative Reward | Slate CTR (%) | Cart Rate (%) | Conv. Rate (%) | Neg. Feed. (%) | Early Reg. (0-1k) | Post-Drift Reg. | Paired vs Dept Heuristic (Delta [95% CI], p_holm) | Paired vs Cold LinUCB (Delta [95% CI], p_holm) |
@@ -455,6 +463,16 @@ def generate_benchmark_report(results: Dict[str, Any]):
     for item in paired.get("medium", []):
         paired_lookup[item["test"]] = item
 
+    def format_paired_diff(item, invert=False):
+        if not item:
+            return "—"
+        mean_diff = -item['mean_diff'] if invert else item['mean_diff']
+        ci_low = -item['ci_95'][1] if invert else item['ci_95'][0]
+        ci_high = -item['ci_95'][0] if invert else item['ci_95'][1]
+        p_val = item['p_value_holm']
+        p_str = "< 0.001" if p_val < 0.001 else f"p={p_val:.4f}"
+        return f"{mean_diff:+,.1f} [{ci_low:+,.1f}, {ci_high:+,.1f}], {p_str}"
+
     for pol in hyb_candidates:
         if pol in primary:
             m = primary[pol]
@@ -467,13 +485,29 @@ def generate_benchmark_report(results: Dict[str, Any]):
             early = f"{m['early_regret_1k']['mean']:,.1f}"
             post = f"{m['post_drift_regret']['mean']:,.1f}"
 
-            t_vs_dept = f"{pol} vs Department Heuristic"
-            t_vs_cold = f"{pol} vs Cold LinUCB"
-            res_dept = paired_lookup.get(t_vs_dept)
-            res_cold = paired_lookup.get(t_vs_cold)
+            if pol == "Department Heuristic":
+                dept_str = "Baseline (0.0)"
+            elif f"{pol} vs Department Heuristic" in paired_lookup:
+                dept_str = format_paired_diff(paired_lookup[f"{pol} vs Department Heuristic"], invert=False)
+            elif f"Department Heuristic vs {pol}" in paired_lookup:
+                dept_str = format_paired_diff(paired_lookup[f"Department Heuristic vs {pol}"], invert=True)
+            elif pol == "Cold LinUCB" and "Cold LinUCB vs Department Heuristic" in paired_lookup:
+                dept_str = format_paired_diff(paired_lookup["Cold LinUCB vs Department Heuristic"], invert=False)
+            else:
+                dept_str = "—"
 
-            dept_str = f"{res_dept['mean_diff']:+,.1f} [{res_dept['ci_95'][0]:+,.1f}, {res_dept['ci_95'][1]:+,.1f}], p={res_dept['p_value_holm']:.4f}" if res_dept else ("Baseline (0.0)" if pol == "Department Heuristic" else "—")
-            cold_str = f"{res_cold['mean_diff']:+,.1f} [{res_cold['ci_95'][0]:+,.1f}, {res_cold['ci_95'][1]:+,.1f}], p={res_cold['p_value_holm']:.4f}" if res_cold else ("Baseline (0.0)" if pol == "Cold LinUCB" else "—")
+            if pol == "Cold LinUCB":
+                cold_str = "Baseline (0.0)"
+            elif f"{pol} vs Cold LinUCB" in paired_lookup:
+                cold_str = format_paired_diff(paired_lookup[f"{pol} vs Cold LinUCB"], invert=False)
+            elif f"Cold LinUCB vs {pol}" in paired_lookup:
+                cold_str = format_paired_diff(paired_lookup[f"Cold LinUCB vs {pol}"], invert=True)
+            elif pol == "Department Heuristic" and "Cold LinUCB vs Department Heuristic" in paired_lookup:
+                cold_str = format_paired_diff(paired_lookup["Cold LinUCB vs Department Heuristic"], invert=True)
+            elif pol == "Discounted LinUCB (gamma=0.9995)" and "Discounted (gamma*=0.9995) vs Cold LinUCB" in paired_lookup:
+                cold_str = format_paired_diff(paired_lookup["Discounted (gamma*=0.9995) vs Cold LinUCB"], invert=False)
+            else:
+                cold_str = "—"
 
             table_hybrids += f"| **{pol}** | {reg_ci} | {rew} | {ctr} | {cart} | {conv} | {neg} | {early} | {post} | {dept_str} | {cold_str} |\n"
 
@@ -495,8 +529,8 @@ def generate_benchmark_report(results: Dict[str, Any]):
             table_conf += f"| **{pol}** | {r_drift} | {r_new} | {r_both} | {traj_o} | {reg_sh} | {exp_share} | {rew_new} | {reg_new} |\n"
 
     # Table 6: Misspecification Robustness Suite
-    table_misspec = """| Policy | Well-Specified Base Regret | Hidden Style Regret | Nonlinear Interactions Regret | High Funnel Conversion Regret | Base Traj. Oracle | Nonlinear Traj. Oracle | Nonlinear Regret Share (%) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+    table_misspec = """| Policy | Base Regret | Hidden Style Regret | Nonlinear Regret | High Funnel Regret | Base Reg. Share (%) | Hidden Reg. Share (%) | Nonlin. Reg. Share (%) | Funnel Reg. Share (%) | Base Traj. Oracle | Hidden Traj. Oracle | Nonlin. Traj. Oracle | Funnel Traj. Oracle |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 """
     for pol in primary.keys():
         if pol in misspec.get("hidden_style", {}):
@@ -504,10 +538,18 @@ def generate_benchmark_report(results: Dict[str, Any]):
             style_r = f"{misspec['hidden_style'][pol]['cumulative_regret']['mean']:,.1f}"
             nonlin_r = f"{misspec['nonlinear_interactions'][pol]['cumulative_regret']['mean']:,.1f}"
             funnel_r = f"{misspec['high_funnel_conversion'][pol]['cumulative_regret']['mean']:,.1f}"
+
+            sh_base = f"{primary[pol]['regret_share']['mean']*100:.1f}%"
+            sh_style = f"{misspec['hidden_style'][pol]['regret_share']['mean']*100:.1f}%"
+            sh_nonlin = f"{misspec['nonlinear_interactions'][pol]['regret_share']['mean']*100:.1f}%"
+            sh_funnel = f"{misspec['high_funnel_conversion'][pol]['regret_share']['mean']*100:.1f}%"
+
             traj_base = f"{primary[pol]['cumulative_trajectory_oracle_reward']['mean']:,.1f}"
+            traj_style = f"{misspec['hidden_style'][pol]['cumulative_trajectory_oracle_reward']['mean']:,.1f}"
             traj_nonlin = f"{misspec['nonlinear_interactions'][pol]['cumulative_trajectory_oracle_reward']['mean']:,.1f}"
-            reg_sh_nonlin = f"{misspec['nonlinear_interactions'][pol]['regret_share']['mean']*100:.1f}%"
-            table_misspec += f"| **{pol}** | {base_r} | {style_r} | {nonlin_r} | {funnel_r} | {traj_base} | {traj_nonlin} | {reg_sh_nonlin} |\n"
+            traj_funnel = f"{misspec['high_funnel_conversion'][pol]['cumulative_trajectory_oracle_reward']['mean']:,.1f}"
+
+            table_misspec += f"| **{pol}** | {base_r} | {style_r} | {nonlin_r} | {funnel_r} | {sh_base} | {sh_style} | {sh_nonlin} | {sh_funnel} | {traj_base} | {traj_style} | {traj_nonlin} | {traj_funnel} |\n"
 
     # Table 7: Warm-Start N_cap Sweep
     table_warm = """| Policy | N_cap | Full Cumulative Regret | Early Regret (Rounds 0 - 1,000) | Post-Drift Regret |
@@ -540,14 +582,13 @@ def generate_benchmark_report(results: Dict[str, Any]):
         table_quarters += f"| **{pol}** | {q1:,.1f} | {q2:,.1f} | {q3:,.1f} | {q4:,.1f} | {r_q1:.3f} | {r_q2:.3f} | {r_q3:.3f} | {r_q4:.3f} | {s_q2:+.2f} | {s_q4:+.2f} | {spike:.2f}x |\n"
 
     # Table 9: Before / After Comparison Table
-    table_ba = """| Policy | Phase 11B Benchmark | Phase 12A Baseline | Phase 12A-2 Authoritative | Status & Authoritative Ground Truth |
-| :--- | :--- | :--- | :--- | :--- |
+    table_ba = """| Policy | Phase 12A Baseline | Phase 12A-2 Authoritative | Status & Authoritative Ground Truth |
+| :--- | :--- | :--- | :--- |
 """
     for pol, ba in before_after.items():
-        v_11b = f"{ba.get('phase11b', 0.0):,.1f}" if "phase11b" in ba else "—"
         v_12a = f"{ba.get('phase12a_legacy', 0.0):,.1f}" if "phase12a_legacy" in ba else "—"
         v_fresh = f"{ba.get('phase12a2_authoritative', 0.0):,.1f}"
-        table_ba += f"| **{pol}** | {v_11b} | {v_12a} | **{v_fresh}** | Authoritative Ground Truth (Phase 12A-2) |\n"
+        table_ba += f"| **{pol}** | {v_12a} | **{v_fresh}** | Authoritative Ground Truth (Phase 12A-2) |\n"
 
     # Full report markdown
     report = fr"""# SmartCart AI — Phase 12A-2 Scientific Benchmark Report: Hardened Parity, Determinism & Two-Stage Hybrids
@@ -602,13 +643,13 @@ Evaluating candidate restriction (Stage 1 heuristic department selection + Stage
 
 ### Scientific Findings on Hybrids:
 1. **Candidate Restriction Beats Both Baselines**: Restricting Cold LinUCB to rank products within the user's active target department (`Dept-Restricted LinUCB (Cold)`) eliminates catalog-wide exploration penalties while retaining the capacity to rank items by rating, price, and repeat bonus. This drops regret from $2,942.0$ (Cold LinUCB) and $2,225.6$ (Department Heuristic) down to **{primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f}** (a **{primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Dept-Restricted LinUCB (Cold)']['cumulative_regret']['mean']:,.1f} point improvement** over the heuristic, $p < 0.001$).
-2. **Residual LinUCB Rescaled**: Rescaling the heuristic offset to align with latent utility ($E[V] \\approx 0.1..0.5$) enables Residual LinUCB to achieve **{primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f}**, resolving the Phase 12A implementation defect.
+2. **Residual LinUCB Rescaled**: The heuristic offset ($h_{{\text{{offset}}}} = 0.35$) was derived from first principles to match the simulator's latent expected utility ($\mathbb{{E}}[V] \approx 0.1..0.5$) rather than fit on evaluation seeds. Evaluated across tuning seeds 101-105, this offset enables Residual LinUCB to achieve **{primary['Residual LinUCB']['cumulative_regret']['mean']:,.1f}**, resolving the Phase 12A implementation defect.
 3. **Exploration Quota Trade-Off**: Allocating 2 exploratory slots across the catalog (`m_explore=2`) yields regret **{primary['Dept-Restricted LinUCB + Expl (Cold, m=2)']['cumulative_regret']['mean']:,.1f}**, which outperforms the Department Heuristic by {primary['Department Heuristic']['cumulative_regret']['mean'] - primary['Dept-Restricted LinUCB + Expl (Cold, m=2)']['cumulative_regret']['mean']:,.1f} points while providing active cross-department discovery.
 
 ---
 
 ## 5. Confounded Scenarios Separation (Part C2 / D)
-Separating preference drift ($t=10,000$) from the introduction of 50 new cold-start items ($t=10,000$):
+Separating preference drift ($t=10,000$) from the introduction of 12 cold-start items (2 per category with highest IDs, $t=10,000$):
 {table_conf}
 
 - **Standardized Exposure Definition**: New-item exposure is consistently measured over the second half ($t \\in [10000, 20000)$, 100,000 slots). Oracle new-item exposure is **{conf['both']['Oracle']['new_product_exposure']['mean']*100:.3f}%** and negative feedback is **{conf['both']['Oracle']['negative_feedback_rate']['mean']*100:.3f}%**, reported to 3 decimal places.
@@ -656,11 +697,12 @@ All Phase 12A-2 numbers are computed under deterministic cache validation (`conf
         f.write(report)
     print(f"Generated {out_file}")
 
-    # Also keep phase12a-report.md synchronized for backwards compatibility
-    out_file_legacy = DOCS_DIR / "phase12a-report.md"
-    with open(out_file_legacy, "w", encoding="utf-8") as f:
-        f.write(report)
-    print(f"Generated {out_file_legacy}")
+    # Also keep phase12b-report.md and phase12a-report.md synchronized for backwards compatibility
+    for rep_name in ["phase12b-report.md", "phase12a-report.md"]:
+        out_f = DOCS_DIR / rep_name
+        with open(out_f, "w", encoding="utf-8") as f:
+            f.write(report)
+        print(f"Generated {out_f}")
 
 
 def generate_chat_summary(results: Dict[str, Any]):
@@ -817,9 +859,14 @@ See [`docs/phase12a2-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-A
         parts = content.split("### 9.1 Calibrated Simulator v2 Benchmark Results")
         header = parts[0]
         remainder = parts[1]
-        next_sec_idx = remainder.find("\n## ")
+        idx_sub = remainder.find("\n### ")
+        idx_sec = remainder.find("\n## ")
+        if idx_sub != -1 and (idx_sec == -1 or idx_sub < idx_sec):
+            next_sec_idx = idx_sub
+        else:
+            next_sec_idx = idx_sec
         after = remainder[next_sec_idx:] if next_sec_idx != -1 else ""
-        new_content = header + sec_9_1.strip() + "\n" + after
+        new_content = header + sec_9_1.strip() + "\n\n" + after.lstrip("\n")
     else:
         if "\n## 10." in content:
             p1, p2 = content.split("\n## 10.", 1)

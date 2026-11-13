@@ -272,6 +272,16 @@ def build_user_context(
     )
 
 
+def compute_brand_bucket(brand: Optional[str]) -> int:
+    """
+    Deterministic brand hash bucket into [0..7] via SHA-256.
+    Ensures bit-for-bit parity across separate Python processes regardless of PYTHONHASHSEED.
+    Matches simulator v2 implementation in experiments/sim_v2/environment.py.
+    """
+    brand_str = str(brand or "Unbranded").strip()
+    return int(hashlib.sha256(brand_str.encode("utf-8")).hexdigest()[:8], 16) % 8
+
+
 def extract_feature_vector(context: UserContext, product: Any) -> np.ndarray:
     """Generate the 36-dimensional joint feature vector phi(u, p)."""
     phi = np.zeros(FEATURE_DIMENSION, dtype=np.float64)
@@ -334,7 +344,7 @@ def extract_feature_vector(context: UserContext, product: Any) -> np.ndarray:
     phi[21] = max(0.0, min(1.0, p_pop / 100.0))
 
     # 22 - 29: Brand Hash Buckets (8 bins)
-    bucket = abs(hash(p_brand)) % 8
+    bucket = compute_brand_bucket(p_brand)
     phi[22 + bucket] = 1.0
 
     # 30: New Product Flag

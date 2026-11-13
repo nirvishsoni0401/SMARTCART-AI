@@ -16,6 +16,7 @@ import os
 import sys
 import time
 import argparse
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter, defaultdict
@@ -231,7 +232,7 @@ def compute_mapping_for_split(
         else:
             rc = item_root_cat.get(iid, 0)
             dept = root_to_dept.get(rc, depts_by_size[0])
-            cl = (hash(rc) % 6)
+            cl = int(hashlib.sha256(str(rc).encode("utf-8")).hexdigest()[:8], 16) % 6
             is_cold = 1 if item_events.get(iid, 0) == 0 else 0
             conf = 0.50 if is_cold else 0.60
         items_by_dept[dept].append((iid, cl, conf))

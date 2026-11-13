@@ -57,6 +57,8 @@ export const api = {
 
   // Recommendations
   getRecommendations: (params) => apiClient.get('/recommendations', { params }),
+  getRecentlyViewed: (limit = 10, sessionId) =>
+    apiClient.get('/events/recently-viewed', { params: { limit, session_id: sessionId } }),
 
   // Feedback Events
   recordEvent: (productId, eventType, logId, sessionId, origin = 'live') =>

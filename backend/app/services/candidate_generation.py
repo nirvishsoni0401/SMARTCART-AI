@@ -71,7 +71,7 @@ def generate_candidates(
         for cat in CATEGORIES:
             cat_products = (
                 query.filter(Product.category == cat)
-                .order_by(desc(Product.popularity_score), desc(Product.rating))
+                .order_by(desc(Product.popularity_score), desc(Product.rating), Product.id.asc())
                 .limit(per_cat)
                 .all()
             )
@@ -84,7 +84,7 @@ def generate_candidates(
         candidates = candidates[:candidate_pool_size]
     else:
         candidates = (
-            query.order_by(desc(Product.popularity_score), desc(Product.rating))
+            query.order_by(desc(Product.popularity_score), desc(Product.rating), Product.id.asc())
             .limit(candidate_pool_size)
             .all()
         )

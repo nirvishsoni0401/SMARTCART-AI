@@ -39,7 +39,8 @@ class PopularityRecommender(BaseRecommender):
                 )
             )
 
-        scored.sort(key=lambda x: x.score, reverse=True)
+        # Sort descending by popularity score with deterministic product_id tie-breaking
+        scored.sort(key=lambda x: (-x.score, x.candidate.product_id))
         return scored[:top_k]
 
     def update(self, feature_vector: np.ndarray, reward: float) -> None:

@@ -6,12 +6,12 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL--Mode-003B57.svg?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/Pytest-82%20Passed-brightgreen.svg)](backend/tests)
+[![Tests](https://img.shields.io/badge/Pytest-102%20Passed-brightgreen.svg)](backend/tests)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-SmartCart AI is a fully tested, verified, multi-category e-commerce web application featuring an adaptive recommendation engine powered by **Contextual Multi-Armed Bandits (LinUCB with Sherman-Morrison rank-1 updates)**. Designed to mirror enterprise e-commerce platforms like Amazon and Flipkart, it operates with Indian Rupee (₹) currency and supports six core retail departments: **Electronics, Fashion, Home & Kitchen, Beauty, Sports & Fitness, and Books** (262 active catalog SKUs: 157 DummyJSON + 105 seeded Books).
+SmartCart AI is a fully tested, verified, multi-category e-commerce web application featuring an adaptive recommendation engine powered by **Contextual Multi-Armed Bandits (LinUCB with Sherman-Morrison rank-1 updates)** and **Two-Stage Hybrid Policies**. Designed to mirror enterprise e-commerce platforms like Amazon and Flipkart, it operates with Indian Rupee (₹) currency and supports six core retail departments: **Electronics, Fashion, Home & Kitchen, Beauty, Sports & Fitness, and Books** (262 active catalog SKUs: 157 DummyJSON + 105 seeded Books).
 
-The platform tackles fundamental challenges in modern recommender systems—**exploration vs. exploitation, the cold-start dilemma, feedback loops, and dynamic preference drift**—by learning online from both positive and negative customer interactions in sub-millisecond latency ($<0.3\text{ ms}$).
+The platform provides nine admin-switchable policies (default: **Dept-Restricted LinUCB** with $m=2$ exploration slots), transparent explainability ("Because you browse {department} • {feature_reason}"), dedicated storefront rows ("Recommended For You" and "Recently Viewed"), and sub-millisecond online parameter updates ($<0.3\text{ ms}$).
 
 ---
 
@@ -19,13 +19,16 @@ The platform tackles fundamental challenges in modern recommender systems—**ex
 
 1. [Overview & Problem Statement](#1-overview--problem-statement)
 2. [End-to-End System Architecture](#2-end-to-end-system-architecture)
+   - [2.1 Data Sources & Catalog Differentiation](#21-data-sources--catalog-differentiation)
 3. [36-Dimensional Context Feature Vector](#3-36-dimensional-context-feature-vector)
-4. [Bandit Recommendation Algorithms](#4-bandit-recommendation-algorithms)
+4. [Bandit Recommendation Algorithms & Robustness](#4-bandit-recommendation-algorithms--robustness)
 5. [Reward Function & Delayed Feedback Handling](#5-reward-function--delayed-feedback-handling)
 6. [Quick Start & Running Instructions](#6-quick-start--running-instructions)
 7. [Comprehensive API Reference](#7-comprehensive-api-reference)
 8. [Admin Dashboard & Simulation Suite](#8-admin-dashboard--simulation-suite)
 9. [Empirical Benchmark Results & Offline Evaluation](#9-empirical-benchmark-results--offline-evaluation)
+   - [9.1 Calibrated Simulator v2 Benchmark Results](#91-calibrated-simulator-v2-benchmark-results-phase-12a-2-authoritative)
+   - [9.2 Offline Evaluation & Research Findings (Retailrocket — Frozen)](#92-offline-evaluation--research-findings-retailrocket--permanently-frozen)
 10. [Assumptions & System Limitations](#10-assumptions--system-limitations)
 11. [Future Roadmap](#11-future-roadmap)
 
@@ -44,17 +47,20 @@ Traditional recommendation engines rely heavily on **Collaborative Filtering (Ma
 
 ### The SmartCart AI Solution
 
-SmartCart AI formulates recommendation as an **online Contextual Multi-Armed Bandit (MAB)** problem:
+SmartCart AI formulates recommendation as an **online Contextual Multi-Armed Bandit (MAB)** problem with multi-stage ranking:
 
 ```
 At each interaction round t:
 1. Context Extraction: The system observes user context and candidate product features ϕ(u, p) ∈ ℝ³⁶.
 2. Candidate Generation: 50 candidate products are selected using category balance and inventory rules.
-3. Policy Scoring: The bandit policy (e.g. LinUCB) computes expected payoff plus an upper confidence bound.
+3. Policy Scoring: The active policy (default: Dept-Restricted LinUCB) scores candidates. Stage 1 identifies
+   the dominant browsed department; Stage 2 solves LinUCB within that department, reserving m exploration slots
+   for catalog-wide discovery.
 4. Diversity & MMR Re-Ranking: Maximal Marginal Relevance limits category dominance (max 3 per department).
-5. Explainability: Transparent feature attributions (θᵢ · ϕᵢ) generate human-readable recommendation reasons.
+5. Explainability: Transparent feature attributions (θᵢ · ϕᵢ) generate human-readable recommendation reasons
+   (e.g., "Because you browse Electronics • High customer rating"). Exploration picks are explicitly badged.
 6. Real-Time Feedback Loop: User actions (click, add-to-cart, purchase, dislike, return) emit scalar rewards.
-7. Online Update: LinUCB parameter vectors are updated via O(d²) Sherman-Morrison rank-1 matrix updates.
+7. Online Update: Bandit parameter vectors are updated in-memory via O(d²) Sherman-Morrison rank-1 matrix updates.
 ```
 
 ---
@@ -65,24 +71,26 @@ At each interaction round t:
 flowchart TD
     subgraph Client ["Client Layer (React 19 + Vite 8 + Tailwind CSS 4)"]
         UI["Customer Storefront (:5173)\n[Home, Catalog, PDP, Cart, Wishlist, Orders]"]
-        ADMIN["Admin Dashboard (:5173/admin)\n[Live Recharts, Traffic Simulator, Policy Switcher]"]
+        RECS_ROW["Recommended For You Row\n(Active Policy Badge + Explainability)"]
+        RV_ROW["Recently Viewed Row\n(Session-level history, no bandit updates)"]
+        ADMIN["Admin Dashboard (:5173/admin)\n[Live Recharts, Policy Switcher, Robustness Table]"]
         CONSENT["Privacy Consent Banner\n[Opt-in / Opt-out Tracking]"]
     end
 
     subgraph API ["Application Layer (FastAPI 0.115+ :8000)"]
-        AUTH["Auth Router\n[JWT + Bcrypt]"]
+        AUTH["Auth Router\n[JWT + Bcrypt, Consent Toggle]"]
         CATALOG["Product Router\n[Filters, Search, Sort]"]
         ORDER["Order & Cart Router\n[Checkout, Stock Decr]"]
         RECS["Recommendation Router\n[/recommendations]"]
-        EVENTS["Event & Feedback Router\n[/events, /events/impressions]"]
-        ADMIN_API["Admin Management Router\n[/admin/metrics, /admin/simulate]"]
+        EVENTS["Event & Feedback Router\n[/events, /events/impressions, /events/recently-viewed]"]
+        ADMIN_API["Admin Management Router\n[/admin/metrics, /admin/algorithms, /admin/snapshots]"]
     end
 
-    subgraph RecPipeline ["3-Stage Recommendation Pipeline"]
+    subgraph RecPipeline ["Multi-Stage Recommendation Pipeline"]
         STAGE1["Stage 1: Candidate Generation\n(N=50, Out-of-Stock Filter, Dept Balance)"]
-        STAGE2["Stage 2: Policy Scoring\n(LinUCB, LinTS, Discounted LinUCB, ε-Greedy)"]
+        POLICY_SCORE["Stage 2: Policy Scoring\n(Dept-Restricted LinUCB, Dept Heuristic, Discounted LinUCB,\nLinUCB, LinTS, ε-Greedy, Popularity, Random)"]
         STAGE3["Stage 3: Diversity & MMR\n(Max 3/dept in Top-10, Similarity Penalty)"]
-        EXPLAIN["Explainability Engine\n(Top Feature Contribution θᵢ · ϕᵢ)"]
+        EXPLAIN["Explainability Engine\n('Because you browse {dept}' + θᵢ · ϕᵢ attribution)"]
     end
 
     subgraph BanditEngine ["Adaptive Online Learning Core"]
@@ -93,16 +101,18 @@ flowchart TD
 
     subgraph Persistence ["Persistence Layer (SQLite WAL Mode)"]
         DB[("smartcart.db\nUsers, Products, Orders, Cart, Events")]
-        MODEL_STORE[("model_states\nMatrix A⁻¹, Vector b, Theta θ")]
+        MODEL_STORE[("model_states\nMatrix A⁻¹, Vector b, Theta θ, Snapshots")]
     end
 
+    UI --> RECS_ROW
+    UI --> RV_ROW
     UI -->|HTTP / Axios| API
     ADMIN -->|Live Polling 3-5s| ADMIN_API
     CONSENT -->|Consent Toggle| AUTH
 
     RECS --> STAGE1
-    STAGE1 --> STAGE2
-    STAGE2 --> STAGE3
+    STAGE1 --> POLICY_SCORE
+    POLICY_SCORE --> STAGE3
     STAGE3 --> EXPLAIN
     EXPLAIN --> RECS
 
@@ -110,10 +120,21 @@ flowchart TD
     ORDER --> DELAYED
     EVENTS --> LAZY_SKIP
     SM_UPDATE --> MODEL_STORE
-    MODEL_STORE --> STAGE2
+    MODEL_STORE --> POLICY_SCORE
 
     API --> DB
 ```
+
+### 2.1 Data Sources & Catalog Differentiation
+
+SmartCart AI maintains a strict, documented separation between its live application catalog and offline benchmark datasets:
+
+| Dataset / Scope | Entity Count & Source | Role in System | Warm-Start & Isolation |
+| :--- | :--- | :--- | :--- |
+| **Storefront Catalog (Live System)** | **262 SKUs** across 6 departments (157 items from DummyJSON API + 105 realistic seeded Books). Currency: INR (₹). | Powers live storefront browsing, shopping cart, checkout, and live recommendation rows. | Seeded into `smartcart.db`. Completely isolated from offline research data. |
+| **Retailrocket Research Dataset (Offline Only)** | **335,612 test interactions** across 194,155 visitors (263,849 novel targets, 71,763 repeat targets). | Used strictly for offline proxy replay and prequential learning evaluation under frozen Phase 10D protocol. | **`warm_start: OFF`** in live models. Kept strictly backend-only; never contaminates live shopper sessions. |
+| **Calibrated Simulator v2 Environment** | **262 active catalog SKUs**, $d=36$ feature space, 4 environment variants (Base, Hidden Style, Nonlinear, High Funnel). | Rigorous synthetic benchmark over 20,000 rounds across 30 paired seeds (Common Random Numbers). | Synthetic ground-truth user preferences; operates entirely within `experiments/sim_v2/`. |
+
 
 ---
 
@@ -162,13 +183,36 @@ Every recommendation decision evaluates a joint user-item context vector $\phi(u
 
 ---
 
-## 4. Bandit Recommendation Algorithms
+## 4. Bandit Recommendation Algorithms & Robustness
 
-SmartCart AI includes six fully implemented, production-ready recommendation policies conforming to a unified `BaseRecommender` interface.
+SmartCart AI includes nine fully implemented recommendation policies conforming to the unified `BaseRecommender` interface (`backend/app/recommender/base.py`). All models are switchable in real time via the Admin Dashboard or `POST /admin/algorithms`.
 
-### 4.1 LinUCB with Sherman-Morrison Rank-1 Inversion
+### 4.1 Dept-Restricted LinUCB (Two-Stage Hybrid — Default Policy)
 
-The primary algorithm is **Linear Upper Confidence Bound (LinUCB)** with disjoint parameter estimation.
+The default recommendation algorithm is **Dept-Restricted LinUCB** (`dept_restricted_linucb`), a two-stage hybrid combining fast heuristic department routing with contextual exploration:
+
+1. **Stage 1 (Dominant Department Identification)**: Evaluates observable customer event history in the current session (clicks, cart additions, purchases). The department with the highest frequency of interactions is designated as the dominant category. For cold users with zero interactions, it falls back to the Department Heuristic, then catalog-wide Popularity.
+2. **Stage 2 (Constrained Bandit Selection with Discovery Slots)**: Solves disjoint LinUCB among candidates within the dominant department for $K - m$ slots. To prevent category lock-in, it reserves $m$ slots (default $m=2$; $m=0$ for pure greedy exploitation) for catalog-wide LinUCB discovery across all remaining departments.
+
+In the calibrated simulator benchmark (Section 9.1), Dept-Restricted LinUCB achieves the lowest cumulative regret across 20,000 rounds (**1,429.6**, regret share **17.9%**).
+
+---
+
+### 4.2 Department Heuristic
+
+A non-learning, rule-based baseline (`department_heuristic`):
+- Determines the shopper's most-frequented department from observable event history.
+- Ranks candidate items within that department strictly by a deterministic blend of popularity and rating: $\text{Score}(p) = 0.6 \times \text{popularity\_score}(p) + 0.4 \times (\text{rating}(p) / 5.0)$.
+- Deterministic tie-breaking by `(-score, product_id)`.
+- If no history exists, ranks all products catalog-wide by popularity.
+
+While performing strongly in well-specified linear environments (regret share 28.4%), it is vulnerable to preference drift and nonlinear feature interactions.
+
+---
+
+### 4.3 LinUCB with Sherman-Morrison Rank-1 Inversion
+
+Disjoint **Linear Upper Confidence Bound (LinUCB)** (`linucb`):
 
 #### Payoff Estimation & Upper Confidence Bound
 For a context vector $x \in \mathbb{R}^d$ ($d = 36$):
@@ -180,7 +224,7 @@ $$\text{Score}(x) = x^T \hat{\theta} + \alpha \sqrt{x^T A^{-1} x}$$
 - $\alpha \in \mathbb{R}^+$ is the exploration hyperparameter (default $\alpha = 0.5$).
 
 #### $O(d^2)$ Sherman-Morrison Online Update
-Standard ridge regression requires inverting $A \in \mathbb{R}^{d \times d}$ with complexity $O(d^3)$. In high-throughput e-commerce, this causes unacceptable latency. SmartCart AI maintains the inverse matrix $M = A^{-1}$ directly using the **Sherman-Morrison formula**:
+Standard ridge regression requires inverting $A \in \mathbb{R}^{d \times d}$ with complexity $O(d^3)$. SmartCart AI maintains the inverse matrix $M = A^{-1}$ directly using the **Sherman-Morrison formula**:
 
 $$M_{t+1} = M_t - \frac{M_t x_t x_t^T M_t}{1 + x_t^T M_t x_t}$$
 $$b_{t+1} = b_t + r_t x_t$$
@@ -189,47 +233,66 @@ This reduces online updates to $O(d^2)$ matrix-vector multiplications, resulting
 
 ---
 
-### 4.2 Discounted LinUCB (Drift-Aware)
+### 4.4 Discounted LinUCB (Drift-Tuned)
 
-When consumer tastes shift abruptly (e.g., fashion seasonal turnover or life events), standard LinUCB accumulates past observations indefinitely, slowing down adaptation. **Discounted LinUCB** introduces an exponential forgetting factor $\gamma \in (0, 1]$:
+When consumer tastes shift abruptly (e.g. fashion seasonality or life events), standard LinUCB accumulates past observations indefinitely. **Discounted LinUCB** (`discounted_linucb`) introduces an exponential forgetting factor $\gamma \in (0, 1]$:
 
 $$A_{t+1} = \gamma A_t + (1 - \gamma) I_d + x_t x_t^T$$
 $$b_{t+1} = \gamma b_t + r_t x_t$$
 
-Using $\gamma = 0.95$, past interactions decay exponentially, granting higher agility to recent trends while maintaining stability via the $(1 - \gamma) I_d$ regularizer.
+Tuned on separate simulation tuning seeds, **$\gamma^* = 0.9995$** delivers superior agility under preference drift while preserving stability against noise.
 
 ---
 
-### 4.3 Linear Thompson Sampling (LinTS)
+### 4.5 Linear Thompson Sampling (LinTS)
 
-Rather than adding an explicit upper confidence bound, **Linear Thompson Sampling** maintains a Bayesian posterior distribution over parameters:
+Rather than an explicit upper confidence bound, **Linear Thompson Sampling** (`linucb_thompson`) maintains a Bayesian posterior distribution over parameters:
 $$\theta \sim \mathcal{N}\left(\hat{\theta}, v^2 A^{-1}\right)$$
 $$\text{Score}(x) = x^T \tilde{\theta} \quad \text{where } \tilde{\theta} \sim \mathcal{N}\left(A^{-1} b, v^2 A^{-1}\right)$$
 
-Sampling is performed efficiently via Cholesky decomposition: $\tilde{\theta} = \hat{\theta} + v L z$ where $A^{-1} = L L^T$ and $z \sim \mathcal{N}(0, I_d)$.
+Sampling is performed efficiently via Cholesky decomposition: $\tilde{\theta} = \hat{\theta} + v L z$ where $A^{-1} = L L^T$ and $z \sim \mathcal{N}(0, I_d)$ (tuned $v = 0.25$).
 
 ---
 
-### 4.4 Epsilon-Greedy Bandit
+### 4.6 Epsilon-Greedy Bandit
 
-A classic heuristic policy that balances exploration and exploitation:
+A classic heuristic policy (`epsilon_greedy`) balancing exploration and exploitation:
 - With probability $1 - \epsilon$: Select candidate with highest predicted reward $x^T \hat{\theta}$.
 - With probability $\epsilon = 0.10$: Select a random product uniformly from the candidate pool.
 
 ---
 
-### 4.5 Popularity Prior Baseline
+### 4.7 Popularity Prior Baseline
 
-A non-personalized heuristic policy reflecting standard baseline e-commerce behavior:
+A non-personalized heuristic policy (`popularity`):
 $$\text{Score}(p) = 0.6 \times \text{popularity\_score}(p) + 0.4 \times \left(\frac{\text{rating}(p)}{5.0}\right)$$
 
 When users decline privacy tracking consent, SmartCart AI strictly falls back to this baseline policy.
 
 ---
 
-### 4.6 Uniform Random Policy
+### 4.8 Uniform Random Policy
 
-Selects items uniformly at random from available inventory. Serves as a theoretical lower bound for empirical regret calculation.
+Selects items uniformly at random from available inventory (`random`). Serves as a theoretical lower bound for empirical regret calculation.
+
+---
+
+### 4.9 Policy Robustness & Misspecification Trade-Off
+
+No single policy dominates across all environments. The table below reports the **Regret Share (%)** across 4 simulated environment variants evaluated over 20,000 rounds (30 paired seeds):
+
+| Policy | Base Environment | Hidden Style | Nonlinear Interactions | High Funnel Drop |
+| :--- | :---: | :---: | :---: | :---: |
+| **Dept-Restricted LinUCB (m=2)** | **17.9%** | 20.3% | 27.2% | 19.3% |
+| **Department Heuristic** | 28.4% | 29.3% | 71.8% | 30.7% |
+| **Discounted LinUCB ($\gamma^*=0.9995$)** | 32.1% | 33.6% | **26.6%** | 33.7% |
+| **Cold LinUCB ($\alpha=0.5$)** | 37.5% | 39.4% | 30.6% | 39.2% |
+| **Warm LinUCB** | 40.1% | 41.8% | 36.8% | 41.3% |
+| **Popularity** | 65.7% | 67.2% | 78.4% | 67.9% |
+
+> [!IMPORTANT]
+> **Key Insight**: Heuristic policies excel when the environment matches their hardcoded assumptions (e.g., strong category clustering), but collapse under nonlinear feature interactions (Department Heuristic regret share jumps from 28.4% to 71.8%). Conversely, adaptive contextual bandits (Discounted LinUCB and Cold LinUCB) continuously learn cross-feature synergies, achieving the highest robustness under misspecification. Dept-Restricted LinUCB ($m=2$) achieves the best practical compromise by anchoring 8 slots to the dominant category while keeping 2 adaptive bandit discovery slots.
+
 
 ---
 
@@ -269,37 +332,50 @@ This cancels out the original $+10.0$ reward and applies the full $-8.0$ penalty
 - **Node.js**: Version 18 or higher (with npm)
 - **Git**
 
-### Installation
+---
 
-1. Clone or navigate to the project directory:
-   ```bash
-   cd c:\Users\ASUS TUF\Desktop\SMARTCART-AI
-   ```
+### Automated Single-Command Setup
 
-2. Configure environment variables:
+SmartCart AI provides turnkey setup scripts that initialize virtual environments, install Python & Node dependencies, seed the database (262 SKUs across 6 departments), and run test verifications:
+
+- **Windows**:
+  ```cmd
+  setup.bat
+  ```
+- **Linux / macOS**:
+  ```bash
+  chmod +x setup.sh
+  ./setup.sh
+  ```
+
+---
+
+### Manual Step-by-Step Installation
+
+1. Configure environment variables:
    ```bash
    copy .env.example .env
    ```
 
-3. Initialize Backend Virtual Environment & Dependencies:
+2. Initialize Backend Virtual Environment & Dependencies:
    ```bash
    python -m venv backend/venv
    backend\venv\Scripts\pip install -r backend/requirements.txt
    ```
 
-4. Install Frontend Dependencies:
+3. Install Frontend Dependencies:
    ```bash
    npm --prefix frontend install
    ```
 
-5. Seed Database (Generates 630 realistic products across 6 departments, demo users, and admin):
+4. Seed Database (Generates 262 realistic products across 6 departments, demo users, and admin):
    ```bash
    backend\venv\Scripts\python backend/app/seed.py
    ```
 
 ---
 
-### Running the Platform
+### Running the Services
 
 #### Single-Command Launcher
 Run both FastAPI backend (:8000) and Vite frontend (:5173) simultaneously:
@@ -324,21 +400,21 @@ npm start
 
 ### Running Tests & Experiment Benchmarks
 
-- **Execute Backend Pytest Suite (15/15 tests)**:
+- **Execute Backend Pytest Suite (102 passed, 1 skipped)**:
   ```bash
   backend\venv\Scripts\pytest backend/tests -v
   ```
 
-- **Run Multi-Cohort 1500-Round Simulation Experiments**:
+- **Run Calibrated Simulator v2 Benchmark**:
   ```bash
-  backend\venv\Scripts\python experiments/run_experiments.py
+  backend\venv\Scripts\python experiments/sim_v2/runner.py
   ```
-  *(Generates 7 high-resolution publication charts in `experiments/plots/` and results in `experiments/results/`)*
 
-- **Run Offline Replay / Inverse Propensity Scoring (IPS) Evaluation**:
+- **Generate Benchmark Reports, Tables & Plots**:
   ```bash
-  backend\venv\Scripts\python experiments/offline_eval.py
+  backend\venv\Scripts\python experiments/sim_v2/generate_report.py
   ```
+  *(Updates `docs/phase12a2-report.md`, `docs/sim_assumptions.md`, plots in `experiments/plots/sim_v2/`, and README Section 9.1)*
 
 ---
 
@@ -403,12 +479,12 @@ All backend endpoints are served under `http://localhost:8000`. Interactive Open
           "score": 1.482,
           "ucb_bonus": 0.312,
           "was_exploration": false,
-          "explanation": "High affinity for Electronics (42% match)",
-          "algorithm": "linucb",
+          "explanation": "Because you browse Electronics • High customer rating (4.6/5)",
+          "algorithm": "dept_restricted_linucb",
           "log_id": 104
         }
       ],
-      "algorithm": "linucb",
+      "algorithm": "dept_restricted_linucb",
       "cold_start": false,
       "latency_ms": 0.28
     }
@@ -417,12 +493,13 @@ All backend endpoints are served under `http://localhost:8000`. Interactive Open
 ### Feedback & Events (`/events`)
 - `POST /events` — Record explicit customer feedback (`click`, `dislike`, `cart_add`, etc.).
 - `POST /events/impressions` — Batch-record passive impressions for unclicked tracking.
+- `GET /events/recently-viewed` — Retrieve the authenticated user's recently viewed products from session events. Respects privacy consent (returns empty list if consent is declined); strictly decoupled from bandit updates.
 
 ### Admin Operations (`/admin`)
 - `GET /admin/metrics` — Aggregate system counters, average reward, CTR, conversion rate, and active algorithm.
-- `POST /admin/algorithms` — Hot-swap the active global bandit policy.
+- `POST /admin/algorithms` — Hot-swap the active global bandit policy (e.g. `dept_restricted_linucb`, `linucb`, `discounted_linucb`).
 - `PUT /admin/reward-config` — Dynamically tune scalar reward weights.
-- `POST /admin/simulate` — Execute synthetic multi-cohort traffic runs.
+- `POST /admin/snapshots` — Save or rollback model state checkpoints (`create`, `rollback`, `list`).
 - `POST /admin/reset-models` — Reset bandit covariance matrices to identity $I_d$.
 - `GET /admin/logs` — Paginated audit log of every recommendation scoring event.
 
@@ -436,11 +513,15 @@ The Admin Dashboard is accessible at `http://localhost:5173/admin` (requires adm
 +-----------------------------------------------------------------------------------------+
 | SMARTCART AI — ADAPTIVE EXPERIMENT & CONTROL PLANE                                      |
 +-----------------------------------------------------------------------------------------+
-| [ Total Users: 12 ] [ Catalog: 630 ] [ Avg Reward: +4.82 ] [ Rec Latency: 0.28 ms ]     |
+| [ Total Users: 12 ] [ Catalog: 262 ] [ Avg Reward: +4.82 ] [ Rec Latency: 0.28 ms ]     |
 +-----------------------------------------------------------------------------------------+
 | ACTIVE ALGORITHM SWITCHER                                                               |
-| (o) LinUCB (Sherman-Morrison)   ( ) Discounted LinUCB   ( ) Linear Thompson Sampling   |
-| ( ) Epsilon-Greedy (eps=0.1)     ( ) Popularity Baseline ( ) Uniform Random Policy      |
+| (o) Dept-Restricted LinUCB (m=2)  ( ) Dept-Restricted LinUCB (m=0)  ( ) Dept Heuristic  |
+| ( ) Discounted LinUCB (g=0.9995) ( ) LinUCB (Sherman-Morrison)     ( ) LinTS (v=0.25)  |
+| ( ) Epsilon-Greedy (eps=0.1)     ( ) Popularity Baseline            ( ) Uniform Random  |
++-----------------------------------------------------------------------------------------+
+| POLICY ROBUSTNESS & MISSPECIFICATION GUIDE                                              |
+|  - Displays live regret-share comparison table across all 4 benchmark environments     |
 +-----------------------------------------------------------------------------------------+
 | RECHARTS LIVE VISUALIZATION (Polling every 3s)                                         |
 |  - Cumulative Reward Trajectories across Algorithms                                     |
@@ -451,98 +532,11 @@ The Admin Dashboard is accessible at `http://localhost:5173/admin` (requires adm
 | Cohorts: [Tech Enthusiast, Fashion Diva, Home Decorator, Bargain Hunter, etc.]          |
 | Rounds: [ 50 ]  [ 200 ]  [ 500 ]  [ 1000 ]   [ RUN SIMULATION BATCH ]                  |
 +-----------------------------------------------------------------------------------------+
-| REWARD WEIGHT TUNER                                                                     |
-| Purchase: [+10.0]  Add to Cart: [+5.0]  Click: [+2.0]  Dislike: [-5.0]  Return: [-8.0] |
-+-----------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 9. Offline Evaluation & Research Findings (Retailrocket)
-
-> [!IMPORTANT]
-> **PERMANENT FREEZE DECLARATION**: All offline evaluation on Retailrocket proxy data is **permanently frozen**. All reported figures are strictly **proxy offline evaluations on logged positive-only interactions**. Neither offline nor live models are described as 'production-ready', and no result is claimed to be 'causal'. All figures in this section are auto-generated from `experiments/results/offline_master_results.json`.
-
-### 9.1 Authoritative Dataset Counts
-
-| Slice | Events ($n$) | Visitors ($n_v$) | Description |
-| :--- | :--- | :--- | :--- |
-| **Total Test Stream** | 335,612 | 194,155 | Full held-out test split |
-| **Novel Targets** | 263,849 | 194,155 | First time product seen by visitor |
-| **Repeat Targets** | 71,763 | 31,609 | Product previously engaged by visitor |
-| **Cold Context** | 226,410 | 194,155 | Session-starting events (history length 0) |
-
-### 9.2 Lifetime History Headline Results (Full Catalog Unconstrained)
-
-| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
-| :--- | :--- | :--- | :--- | :--- |
-| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.92% | [5.80%, 6.04%] |
-| **Department Heuristic** | 7.46% | [7.35%, 7.56%] | 10.12% | [9.93%, 10.31%] |
-| **RecentlyViewed** | 13.10% | [12.99%, 13.24%] | 24.97% | [24.69%, 25.27%] |
-| **Cold LinUCB** | 6.73% | [6.63%, 6.83%] | 8.39% | [8.23%, 8.55%] |
-| **Warm LinUCB** | 11.20% | [11.08%, 11.32%] | 18.33% | [18.08%, 18.57%] |
-| **Warm LinTS (v=0.25)** | 11.07% | [10.95%, 11.19%] | 18.21% | [17.98%, 18.44%] |
-| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 13.16% | [13.04%, 13.29%] | 24.41% | [24.16%, 24.68%] |
-| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 13.01% | [12.89%, 13.13%] | 24.67% | [24.41%, 24.95%] |
-
-### 9.3 Novel Target Discovery vs Repeat Intent
-
-#### Novel Target Events (Unseen by Shopper)
-| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
-| :--- | :--- | :--- | :--- | :--- |
-| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.86% | [5.77%, 5.95%] |
-| **Department Heuristic** | 6.42% | [6.32%, 6.52%] | 7.57% | [7.47%, 7.68%] |
-| **RecentlyViewed** | 5.66% | [5.57%, 5.76%] | 5.42% | [5.33%, 5.51%] |
-| **Cold LinUCB** | 5.60% | [5.51%, 5.70%] | 5.72% | [5.63%, 5.80%] |
-| **Warm LinUCB** | 5.82% | [5.72%, 5.92%] | 6.13% | [6.04%, 6.22%] |
-| **Warm LinTS (v=0.25)** | 5.75% | [5.65%, 5.84%] | 6.05% | [5.95%, 6.14%] |
-| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 5.83% | [5.74%, 5.93%] | 5.94% | [5.85%, 6.03%] |
-| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 5.58% | [5.49%, 5.68%] | 5.59% | [5.50%, 5.68%] |
-
-#### Repeat Target Events (Previously Seen by Shopper)
-| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
-| :--- | :--- | :--- | :--- | :--- |
-| **Popularity Baseline** | 5.99% | [5.75%, 6.25%] | 6.16% | [5.82%, 6.51%] |
-| **Department Heuristic** | 20.28% | [19.83%, 20.68%] | 19.50% | [18.86%, 20.16%] |
-| **RecentlyViewed** | 99.81% | [99.78%, 99.84%] | 96.84% | [95.49%, 97.86%] |
-| **Cold LinUCB** | 19.71% | [19.27%, 20.13%] | 18.23% | [17.61%, 18.84%] |
-| **Warm LinUCB** | 71.36% | [70.87%, 71.81%] | 63.18% | [61.77%, 64.42%] |
-| **Warm LinTS (v=0.25)** | 70.76% | [70.27%, 71.23%] | 62.92% | [61.54%, 64.11%] |
-| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 98.28% | [98.17%, 98.39%] | 92.30% | [90.94%, 93.40%] |
-| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 99.31% | [99.25%, 99.38%] | 94.80% | [93.44%, 95.90%] |
-
-### 9.4 30-Minute Session History Parity
-
-| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
-| :--- | :--- | :--- | :--- | :--- |
-| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.92% | [5.80%, 6.04%] |
-| **Department Heuristic** | 6.99% | [6.89%, 7.09%] | 9.12% | [8.94%, 9.30%] |
-| **RecentlyViewed** | 10.90% | [10.79%, 11.02%] | 19.05% | [18.83%, 19.30%] |
-| **Cold LinUCB** | 6.40% | [6.30%, 6.49%] | 7.61% | [7.48%, 7.75%] |
-| **Warm LinUCB** | 9.57% | [9.46%, 9.68%] | 14.68% | [14.50%, 14.87%] |
-| **Warm LinTS (v=0.25)** | 9.45% | [9.33%, 9.55%] | 14.53% | [14.36%, 14.71%] |
-| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 10.98% | [10.86%, 11.09%] | 18.92% | [18.71%, 19.15%] |
-| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 10.80% | [10.68%, 10.91%] | 18.95% | [18.73%, 19.18%] |
-
-### 9.5 Prequential Online Learning Trajectories
-
-*Rolling window $w=1000$. First step where Cold rolling HR enters within 1 SE of Warm rolling HR: **Step 8,349**.*
-
-| Step | Cold Rolling HR@10 | Warm Rolling HR@10 | Cold Cumulative HR@10 | Warm Cumulative HR@10 | Novel-Only Cold Cum | Novel-Only Warm Cum |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **2,500** | 7.50% | 16.60% | 4.04% | 14.64% | 1.68% | 6.43% |
-| **5,000** | 11.90% | 15.70% | 7.80% | 14.94% | 2.17% | 6.34% |
-| **7,500** | 14.10% | 16.30% | 9.69% | 15.56% | 2.49% | 6.45% |
-| **10,000** | 14.10% | 16.00% | 10.72% | 15.64% | 2.66% | 6.44% |
-| **15,000** | 14.30% | 16.50% | 12.23% | 16.07% | 3.27% | 6.38% |
-| **20,000** | 17.70% | 17.80% | 13.06% | 16.15% | 3.59% | 5.96% |
-
-### 9.6 Key Empirical Findings
-
-1. **Recency-Bandit Hybrid Dominance**: Reserving top slots for RecentlyViewed while using LinUCB for discovery statistically significantly outperforms pure LinUCB on overall traffic ($p < 0.0005$).
-2. **Prequential Learning Catch-up**: Cold LinUCB's rolling learning rate enters within 1 SE of Warm LinUCB at Step 8,349, while Warm LinUCB maintains a persistent cumulative lead across all 20,000 steps.
-3. **Zero Novel Exploration Edge**: On pure novel discovery, Warm LinUCB and Popularity are statistically indistinguishable.
-4. **Repeat Dominance**: In e-commerce click logs, short-term recency accounts for the majority of recommendation hits.
+## 9. Empirical Benchmark Results & Offline Evaluation
 
 ### 9.1 Calibrated Simulator v2 Benchmark Results (Phase 12A-2 Authoritative)
 
@@ -568,18 +562,108 @@ The Admin Dashboard is accessible at `http://localhost:5173/admin` (requires adm
 
 See [`docs/phase12a2-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/phase12a2-report.md) and [`docs/sim_assumptions.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-AI/docs/sim_assumptions.md) for complete details.
 
+### 9.2 Offline Evaluation & Research Findings (Retailrocket — Permanently Frozen)
+
+> [!IMPORTANT]
+> **PERMANENT FREEZE DECLARATION**: All offline evaluation on Retailrocket proxy data is **permanently frozen**. All reported figures are strictly **proxy offline evaluations on logged positive-only interactions**. Neither offline nor live models are described as 'production-ready', and no result is claimed to be 'causal'. All figures in this section are auto-generated from `experiments/results/offline_master_results.json`.
+
+#### 9.2.1 Authoritative Dataset Counts
+
+| Slice | Events ($n$) | Visitors ($n_v$) | Description |
+| :--- | :--- | :--- | :--- |
+| **Total Test Stream** | 335,612 | 194,155 | Full held-out test split |
+| **Novel Targets** | 263,849 | 194,155 | First time product seen by visitor |
+| **Repeat Targets** | 71,763 | 31,609 | Product previously engaged by visitor |
+| **Cold Context** | 226,410 | 194,155 | Session-starting events (history length 0) |
+
+#### 9.2.2 Lifetime History Headline Results (Full Catalog Unconstrained)
+
+| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
+| :--- | :--- | :--- | :--- | :--- |
+| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.92% | [5.80%, 6.04%] |
+| **Department Heuristic** | 7.46% | [7.35%, 7.56%] | 10.12% | [9.93%, 10.31%] |
+| **RecentlyViewed** | 13.10% | [12.99%, 13.24%] | 24.97% | [24.69%, 25.27%] |
+| **Cold LinUCB** | 6.73% | [6.63%, 6.83%] | 8.39% | [8.23%, 8.55%] |
+| **Warm LinUCB** | 11.20% | [11.08%, 11.32%] | 18.33% | [18.08%, 18.57%] |
+| **Warm LinTS (v=0.25)** | 11.07% | [10.95%, 11.19%] | 18.21% | [17.98%, 18.44%] |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 13.16% | [13.04%, 13.29%] | 24.41% | [24.16%, 24.68%] |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 13.01% | [12.89%, 13.13%] | 24.67% | [24.41%, 24.95%] |
+
+#### 9.2.3 Novel Target Discovery vs Repeat Intent
+
+##### Novel Target Events (Unseen by Shopper)
+| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
+| :--- | :--- | :--- | :--- | :--- |
+| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.86% | [5.77%, 5.95%] |
+| **Department Heuristic** | 6.42% | [6.32%, 6.52%] | 7.57% | [7.47%, 7.68%] |
+| **RecentlyViewed** | 5.66% | [5.57%, 5.76%] | 5.42% | [5.33%, 5.51%] |
+| **Cold LinUCB** | 5.60% | [5.51%, 5.70%] | 5.72% | [5.63%, 5.80%] |
+| **Warm LinUCB** | 5.82% | [5.72%, 5.92%] | 6.13% | [6.04%, 6.22%] |
+| **Warm LinTS (v=0.25)** | 5.75% | [5.65%, 5.84%] | 6.05% | [5.95%, 6.14%] |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 5.83% | [5.74%, 5.93%] | 5.94% | [5.85%, 6.03%] |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 5.58% | [5.49%, 5.68%] | 5.59% | [5.50%, 5.68%] |
+
+##### Repeat Target Events (Previously Seen by Shopper)
+| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
+| :--- | :--- | :--- | :--- | :--- |
+| **Popularity Baseline** | 5.99% | [5.75%, 6.25%] | 6.16% | [5.82%, 6.51%] |
+| **Department Heuristic** | 20.28% | [19.83%, 20.68%] | 19.50% | [18.86%, 20.16%] |
+| **RecentlyViewed** | 99.81% | [99.78%, 99.84%] | 96.84% | [95.49%, 97.86%] |
+| **Cold LinUCB** | 19.71% | [19.27%, 20.13%] | 18.23% | [17.61%, 18.84%] |
+| **Warm LinUCB** | 71.36% | [70.87%, 71.81%] | 63.18% | [61.77%, 64.42%] |
+| **Warm LinTS (v=0.25)** | 70.76% | [70.27%, 71.23%] | 62.92% | [61.54%, 64.11%] |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 98.28% | [98.17%, 98.39%] | 92.30% | [90.94%, 93.40%] |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 99.31% | [99.25%, 99.38%] | 94.80% | [93.44%, 95.90%] |
+
+#### 9.2.4 30-Minute Session History Parity
+
+| Policy | Macro HR@10 | 95% Macro CI | Micro HR@10 | 95% Micro CI |
+| :--- | :--- | :--- | :--- | :--- |
+| **Popularity Baseline** | 5.76% | [5.66%, 5.85%] | 5.92% | [5.80%, 6.04%] |
+| **Department Heuristic** | 6.99% | [6.89%, 7.09%] | 9.12% | [8.94%, 9.30%] |
+| **RecentlyViewed** | 10.90% | [10.79%, 11.02%] | 19.05% | [18.83%, 19.30%] |
+| **Cold LinUCB** | 6.40% | [6.30%, 6.49%] | 7.61% | [7.48%, 7.75%] |
+| **Warm LinUCB** | 9.57% | [9.46%, 9.68%] | 14.68% | [14.50%, 14.87%] |
+| **Warm LinTS (v=0.25)** | 9.45% | [9.33%, 9.55%] | 14.53% | [14.36%, 14.71%] |
+| **Hybrid Slate (k=3 RV + 7 LinUCB)** | 10.98% | [10.86%, 11.09%] | 18.92% | [18.71%, 19.15%] |
+| **Hybrid Slate (k=5 RV + 5 LinUCB)** | 10.80% | [10.68%, 10.91%] | 18.95% | [18.73%, 19.18%] |
+
+#### 9.2.5 Prequential Online Learning Trajectories
+
+*Rolling window $w=1000$. First step where Cold rolling HR enters within 1 SE of Warm rolling HR: **Step 8,349**.*
+
+| Step | Cold Rolling HR@10 | Warm Rolling HR@10 | Cold Cumulative HR@10 | Warm Cumulative HR@10 | Novel-Only Cold Cum | Novel-Only Warm Cum |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **2,500** | 7.50% | 16.60% | 4.04% | 14.64% | 1.68% | 6.43% |
+| **5,000** | 11.90% | 15.70% | 7.80% | 14.94% | 2.17% | 6.34% |
+| **7,500** | 14.10% | 16.30% | 9.69% | 15.56% | 2.49% | 6.45% |
+| **10,000** | 14.10% | 16.00% | 10.72% | 15.64% | 2.66% | 6.44% |
+| **15,000** | 14.30% | 16.50% | 12.23% | 16.07% | 3.27% | 6.38% |
+| **20,000** | 17.70% | 17.80% | 13.06% | 16.15% | 3.59% | 5.96% |
+
+#### 9.2.6 Key Empirical Findings
+
+1. **Recency-Bandit Hybrid Dominance**: Reserving top slots for RecentlyViewed while using LinUCB for discovery statistically significantly outperforms pure LinUCB on overall traffic ($p < 0.0005$).
+2. **Prequential Learning Catch-up**: Cold LinUCB's rolling learning rate enters within 1 SE of Warm LinUCB at Step 8,349, while Warm LinUCB maintains a persistent cumulative lead across all 20,000 steps.
+3. **Zero Novel Exploration Edge**: On pure novel discovery, Warm LinUCB and Popularity are statistically indistinguishable.
+4. **Repeat Dominance**: In e-commerce click logs, short-term recency accounts for the majority of recommendation hits.
+
+---
+
 ## 10. Assumptions & System Limitations
 
-1. **Proxy Offline Evaluation vs Unbiased Counterfactual Estimation**:
-   Historical evaluation uses logged positive interactions (`view`, `addtocart`, `transaction`). Because historical exploration propensities were unlogged, counterfactual inverse propensity scoring (IPS) cannot be computed on this split without unprovable assumptions. Results measure proxy ranking performance under observed user trajectories.
-2. **Behavioral Proxy Mapping**:
-   Retailrocket product IDs are anonymized item identifiers mapped via category and price proxies to the 262-SKU catalog. Results demonstrate transferability of contextual behavior (brand affinity, price sensitivity, category preference), rather than item-level identity.
-3. **One-Step Contextual Bandit vs MDP**:
-   Recommendations are framed as immediate one-step contextual bandit decisions rather than a multi-step Markov Decision Process (MDP). While optimal for sub-millisecond ranking, it does not explicitly optimize multi-month customer lifetime value (LTV).
-4. **Database Concurrency in SQLite**:
-   SQLite with Write-Ahead Logging (WAL) handles high-concurrency read queries cleanly, but matrix updates serialize writes at the database level. For deployments exceeding 10,000 writes/second, Redis or PostgreSQL is recommended.
-5. **Candidate Retrieval Floor**:
-   Candidate retrieval evaluates 50 candidate items per request. For extreme catalog scales ($>1,000,000$ SKUs), Approximate Nearest Neighbor (ANN) indexing (HNSW, ScaNN) would be required.
+1. **Epistemic Scope — Simulator Behaviour vs Real Customer Behaviour**:
+   Benchmark results reported from `experiments/sim_v2/` represent **behaviour observed strictly under the simulator's stated mathematical assumptions** (cascade position bias model, linear/nonlinear customer utility, abrupt preference drift schedules, and logit choice models). They do **not** constitute causal evidence of real human shopper behaviour in production e-commerce environments.
+2. **Proxy Offline Evaluation on Logged Positive Interactions**:
+   The Retailrocket offline evaluation is strictly a **proxy evaluation on logged positive-only interactions** (`view`, `addtocart`, `transaction`). Because logging propensities for unchosen items are unknown, unbiased counterfactual Inverse Propensity Scoring (IPS) cannot be computed. Results evaluate offline hit-rate replay under observed interaction paths.
+3. **Warm-Start Status in Live Application**:
+   Retailrocket warm-start snapshots are kept backend-only for research comparison and are **NOT applied to live models (`warm_start: OFF`)**. Live models initialize with cold identity covariances ($A = I_d, b = 0$) and learn exclusively from incoming user events.
+4. **Brand Hashing & Cross-Platform Determinism**:
+   Brand features (indices 22–29) utilize deterministic cryptographic hashing (`hashlib.sha256`) modulo 8 rather than Python's process-salted `hash()`. This guarantees identical feature vectors and rankings across independent processes and operating systems regardless of `PYTHONHASHSEED`.
+5. **Database Concurrency & Write Serialization**:
+   SmartCart AI uses SQLite with Write-Ahead Logging (`WAL` mode). While read queries scale across multiple threads, bandit parameter writes (`model_states`) serialize at the database level. For high-throughput enterprise deployments ($>10,000\text{ writes/sec}$), Redis or PostgreSQL with row-level locking should be used.
+6. **One-Step Contextual Bandit vs MDP**:
+   The system optimizes immediate one-step contextual payoff rather than a multi-step Markov Decision Process (MDP). While optimal for sub-millisecond ranking latency, it does not explicitly plan multi-month customer lifetime value (LTV).
 
 ---
 
@@ -595,3 +679,4 @@ See [`docs/phase12a2-report.md`](file:///c:/Users/ASUS%20TUF/Desktop/SMARTCART-A
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+

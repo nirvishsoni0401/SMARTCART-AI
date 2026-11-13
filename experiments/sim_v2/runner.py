@@ -567,9 +567,9 @@ def build_all_required_units() -> List[Tuple]:
             uid_n = make_unit_id(pol, s, "new_products_only", "medium", None, False, True, 10000)
             tasks.append((pol, s, "medium", "none", HORIZON, False, None, True, alpha, gamma, 10000, "new_products_only", uid_n))
 
-    # 6. Part F Warm-Start Sweep (15 seeds, n_cap in {500, 2000})
+    # 6. Part F Warm-Start Sweep (30 seeds, n_cap in {500, 2000})
     for n_c in [500, 2000]:
-        for s in range(1, 16):
+        for s in PRIMARY_EVAL_SEEDS:
             for pol in ["Warm LinUCB", "Warm LinTS"]:
                 uid = make_unit_id(pol, s, "abrupt_drift", "medium", None, False, True, n_c)
                 tasks.append((pol, s, "medium", "abrupt", HORIZON, False, None, True, alpha, gamma, n_c, "abrupt_drift", uid))
@@ -1078,8 +1078,8 @@ def aggregate_master_results(tuning_data: Optional[Tuple] = None, workers: int =
     for n_c in [500, 2000]:
         for pol in ["Warm LinUCB", "Warm LinTS"]:
             w_runs = [load_unit(make_unit_id(pol, s, "abrupt_drift", "medium", None, False, True, n_c))
-                      for s in range(1, 16) if is_unit_valid(make_unit_id(pol, s, "abrupt_drift", "medium", None, False, True, n_c))]
-            if len(w_runs) == 15:
+                      for s in PRIMARY_EVAL_SEEDS if is_unit_valid(make_unit_id(pol, s, "abrupt_drift", "medium", None, False, True, n_c))]
+            if len(w_runs) >= 10:
                 warm_sweep_results[pol][n_c] = aggregate_policy_runs(w_runs)
 
     # EXACT DETERMINISM: N_cap=0 matches Cold LinUCB/TS identically!

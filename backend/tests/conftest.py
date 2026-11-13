@@ -57,9 +57,12 @@ def isolate_test_database():
 
     # Patch app.database module objects
     orig_engine = db_module.engine
-    orig_SessionLocal = db_module.SessionLocal
+    orig_SessionLocal = getattr(db_module, "_SessionLocal", db_module.SessionLocal)
     db_module.engine = test_engine
-    db_module.SessionLocal = TestSessionLocal
+    if hasattr(db_module, "_SessionLocal"):
+        db_module._SessionLocal = TestSessionLocal
+    else:
+        db_module.SessionLocal = TestSessionLocal
 
     def override_get_db():
         db = TestSessionLocal()
@@ -79,7 +82,10 @@ def isolate_test_database():
     # Clean up dependency overrides
     app.dependency_overrides.pop(db_module.get_db, None)
     db_module.engine = orig_engine
-    db_module.SessionLocal = orig_SessionLocal
+    if hasattr(db_module, "_SessionLocal"):
+        db_module._SessionLocal = orig_SessionLocal
+    else:
+        db_module.SessionLocal = orig_SessionLocal
     test_engine.dispose()
     try:
         temp_dir.cleanup()

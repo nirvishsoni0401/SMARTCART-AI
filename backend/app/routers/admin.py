@@ -61,7 +61,9 @@ def get_metrics(
     total_users = db.query(User).count()
 
     # Aggregate by algorithm
-    algo_names = ["linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random"]
+    algo_names = [
+        "linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random"
+    ]
     algo_stats = {
         name: {
             "algorithm": name,
@@ -81,10 +83,28 @@ def get_metrics(
         for name in algo_names
     }
 
+    def _ensure_algo(algo_key: str):
+        if algo_key not in algo_stats:
+            algo_stats[algo_key] = {
+                "algorithm": algo_key,
+                "cumulative_reward": 0.0,
+                "events_count": 0,
+                "impressions": 0,
+                "clicks": 0,
+                "cart_adds": 0,
+                "purchases": 0,
+                "dislikes": 0,
+                "returns": 0,
+                "skips": 0,
+                "recommended_product_ids": set(),
+                "exploration_count": 0,
+                "total_logs": 0
+            }
+        return algo_stats[algo_key]
+
     for ev in events:
         algo = ev.algorithm.lower()
-        if algo not in algo_stats:
-            continue
+        stats = _ensure_algo(algo)
         stats = algo_stats[algo]
         stats["cumulative_reward"] += ev.reward
         stats["events_count"] += 1
@@ -107,15 +127,15 @@ def get_metrics(
 
     for lg in logs:
         algo = lg.algorithm.lower()
-        if algo in algo_stats:
-            stats = algo_stats[algo]
-            stats["total_logs"] += 1
-            stats["recommended_product_ids"].add(lg.product_id)
-            if lg.was_exploration:
-                stats["exploration_count"] += 1
+        stats = _ensure_algo(algo)
+        stats["total_logs"] += 1
+        stats["recommended_product_ids"].add(lg.product_id)
+        if lg.was_exploration:
+            stats["exploration_count"] += 1
 
     results = []
-    for name in algo_names:
+    all_algo_keys = list(algo_names) + [k for k in algo_stats if k not in algo_names]
+    for name in all_algo_keys:
         st = algo_stats[name]
         impr = max(1, st["impressions"])
         clicks = st["clicks"]
@@ -201,7 +221,10 @@ def set_algorithm(
     body: AlgorithmUpdateRequest,
     current_admin: User = Depends(get_current_admin)
 ):
-    valid = ["linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random"]
+    valid = [
+        "linucb", "discounted_linucb", "linucb_thompson", "epsilon_greedy", "popularity", "random",
+        "department_heuristic", "dept_restricted_linucb", "dept_restricted_linucb_m0", "dept_restricted_linucb_m2"
+    ]
     if body.algorithm.lower() not in valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
