@@ -46,8 +46,8 @@ def test_trajectory_oracle_reward_identity():
     with open(results_path, "r", encoding="utf-8") as f:
         master = json.load(f)
 
-    if master.get("metadata", {}).get("phase") != "12A":
-        pytest.skip("sim_v2_master_results.json is not yet Phase 12A")
+    if master.get("metadata", {}).get("phase") not in ("12A", "12A-2"):
+        pytest.skip("sim_v2_master_results.json is not Phase 12A or 12A-2")
 
     primary = master["primary_benchmark"]
     for pol_name, m in primary.items():
@@ -68,8 +68,8 @@ def test_warm_start_zero_determinism_parity():
     with open(results_path, "r", encoding="utf-8") as f:
         master = json.load(f)
 
-    if master.get("metadata", {}).get("phase") != "12A":
-        pytest.skip("sim_v2_master_results.json is not yet Phase 12A")
+    if master.get("metadata", {}).get("phase") not in ("12A", "12A-2"):
+        pytest.skip("sim_v2_master_results.json is not Phase 12A or 12A-2")
 
     primary = master["primary_benchmark"]
     warm = master["warm_start_sweep"]
@@ -98,8 +98,8 @@ def test_confounded_both_matches_headline():
     with open(results_path, "r", encoding="utf-8") as f:
         master = json.load(f)
 
-    if master.get("metadata", {}).get("phase") != "12A":
-        pytest.skip("sim_v2_master_results.json is not yet Phase 12A")
+    if master.get("metadata", {}).get("phase") not in ("12A", "12A-2"):
+        pytest.skip("sim_v2_master_results.json is not Phase 12A or 12A-2")
 
     primary = master["primary_benchmark"]
     conf_both = master["confounded_scenarios"]["both"]
@@ -176,8 +176,8 @@ def test_check_docs_match_results_phase12a():
     with open(results_path, "r", encoding="utf-8") as f:
         master = json.load(f)
 
-    if master.get("metadata", {}).get("phase") != "12A":
-        pytest.skip("sim_v2_master_results.json is not yet Phase 12A")
+    if master.get("metadata", {}).get("phase") not in ("12A", "12A-2"):
+        pytest.skip("sim_v2_master_results.json is not Phase 12A or 12A-2")
 
     report_path = ROOT_DIR / "docs" / "phase12a-report.md"
     assump_path = ROOT_DIR / "docs" / "sim_assumptions.md"

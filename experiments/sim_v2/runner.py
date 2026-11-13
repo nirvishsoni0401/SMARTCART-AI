@@ -46,6 +46,7 @@ from experiments.sim_v2.policies import (
     DeptPriorLinUCBPolicy,
     SlateMixingPolicy,
     ResidualLinUCBPolicy,
+    DeptRestrictedLinUCBPolicy,
     OraclePolicy,
     ProductionPipelineWrapper
 )
@@ -56,11 +57,16 @@ GRID_EVAL_SEEDS = list(range(1, 11))     # 10 seeds: 1..10
 HORIZON = 20000
 SAMPLE_INTERVAL = 250
 
+GAMMA_CANDIDATES = [0.99, 0.995, 0.998, 0.999, 0.9995, 0.9999, 1.0]
+
 ALL_POLICIES_ORDERED = [
     "Oracle",
-    "Discounted LinUCB (gamma=0.9999)",
-    "Discounted LinUCB (gamma=0.9995)",
+    "Discounted LinUCB (gamma=0.99)",
+    "Discounted LinUCB (gamma=0.995)",
+    "Discounted LinUCB (gamma=0.998)",
     "Discounted LinUCB (gamma=0.999)",
+    "Discounted LinUCB (gamma=0.9995)",
+    "Discounted LinUCB (gamma=0.9999)",
     "Discounted LinUCB (gamma=1.0)",
     "Cold LinUCB",
     "Warm LinUCB",
@@ -73,26 +79,47 @@ ALL_POLICIES_ORDERED = [
     "Slate Mixing (k=3 Dept + LinUCB)",
     "Slate Mixing (k=5 Dept + LinUCB)",
     "Residual LinUCB",
+    "Dept-Restricted LinUCB (Cold)",
+    "Dept-Restricted LinUCB (Discounted)",
+    "Dept-Restricted LinUCB + Expl (Cold, m=2)",
+    "Dept-Restricted LinUCB + Expl (Discounted, m=2)",
     "Epsilon-Greedy",
     "Popularity",
     "Random"
 ]
 
-NEW_POLICIES = [
-    "Department Heuristic (With Diversity)",
+HYBRID_POLICIES = [
     "Dept-Prior LinUCB (w=0.5)",
     "Slate Mixing (k=3 Dept + LinUCB)",
     "Slate Mixing (k=5 Dept + LinUCB)",
-    "Residual LinUCB"
+    "Residual LinUCB",
+    "Dept-Restricted LinUCB (Cold)",
+    "Dept-Restricted LinUCB (Discounted)",
+    "Dept-Restricted LinUCB + Expl (Cold, m=2)",
+    "Dept-Restricted LinUCB + Expl (Discounted, m=2)"
 ]
 
 UNITS_DIR = ROOT_DIR / "experiments" / "results" / "sim_v2" / "units"
 LOGS_DIR = ROOT_DIR / "experiments" / "logs"
 LOG_FILE = LOGS_DIR / "sim_v2_runner.log"
 
-CONFIG_HASH = hashlib.sha256(
-    b"sim_v2_phase12a_v1__feat75f60ed70b2a__h20000__a0.5__g0.9995__b5.72"
-).hexdigest()[:16]
+
+def compute_code_hash() -> str:
+    """Computes a SHA256 hash of simulator environment, user model, policies code and scenario salt."""
+    h = hashlib.sha256()
+    for rel_p in [
+        "experiments/sim_v2/environment.py",
+        "experiments/sim_v2/user_model.py",
+        "experiments/sim_v2/policies.py"
+    ]:
+        p = ROOT_DIR / rel_p
+        if p.exists():
+            h.update(p.read_bytes())
+    h.update(b"horizon_20000_alpha_0.5_gamma_0.9995_phase12a2")
+    return h.hexdigest()[:16]
+
+
+CONFIG_HASH = compute_code_hash()
 
 
 def log(msg: str):
@@ -151,6 +178,12 @@ def build_policy(
         return ColdLinTSPolicy(v_variance=0.25, seed=seed)
     elif name == "Warm LinTS":
         return WarmLinTSPolicy(v_variance=0.25, n_cap=n_cap, lambda_reg=1.0, seed=seed)
+    elif name == "Discounted LinUCB (gamma=0.99)":
+        return DiscountedLinUCBPolicy(alpha=alpha, gamma=0.99, name=name)
+    elif name == "Discounted LinUCB (gamma=0.995)":
+        return DiscountedLinUCBPolicy(alpha=alpha, gamma=0.995, name=name)
+    elif name == "Discounted LinUCB (gamma=0.998)":
+        return DiscountedLinUCBPolicy(alpha=alpha, gamma=0.998, name=name)
     elif name == "Discounted LinUCB (gamma=0.999)":
         return DiscountedLinUCBPolicy(alpha=alpha, gamma=0.999, name=name)
     elif name == "Discounted LinUCB (gamma=0.9995)":
@@ -167,6 +200,14 @@ def build_policy(
         return SlateMixingPolicy(k_heuristic=5, alpha=alpha)
     elif name == "Residual LinUCB":
         return ResidualLinUCBPolicy(alpha=alpha)
+    elif name == "Dept-Restricted LinUCB (Cold)":
+        return DeptRestrictedLinUCBPolicy(name=name, base_bandit=ColdLinUCBPolicy(alpha=alpha), m_explore=0)
+    elif name == "Dept-Restricted LinUCB (Discounted)":
+        return DeptRestrictedLinUCBPolicy(name=name, base_bandit=DiscountedLinUCBPolicy(alpha=alpha, gamma=gamma), m_explore=0)
+    elif name == "Dept-Restricted LinUCB + Expl (Cold, m=2)":
+        return DeptRestrictedLinUCBPolicy(name=name, base_bandit=ColdLinUCBPolicy(alpha=alpha), m_explore=2)
+    elif name == "Dept-Restricted LinUCB + Expl (Discounted, m=2)":
+        return DeptRestrictedLinUCBPolicy(name=name, base_bandit=DiscountedLinUCBPolicy(alpha=alpha, gamma=gamma), m_explore=2)
     elif name == "Oracle":
         return OraclePolicy()
     else:
@@ -249,6 +290,7 @@ def run_single_policy_trace(
     cold_user_regret_sum = 0.0
     cold_user_rounds = 0
     quarter_regrets = [0.0, 0.0, 0.0, 0.0]
+    regrets_1k = [0.0] * max(1, horizon // 1000)
     total_step_time_ms = 0.0
     regret_trace = []
 
@@ -311,6 +353,10 @@ def run_single_policy_trace(
         q_idx = min(3, t // quarter_len)
         quarter_regrets[q_idx] += step_regret
 
+        # 1k bins
+        bin_1k = min(len(regrets_1k) - 1, t // 1000)
+        regrets_1k[bin_1k] += step_regret
+
         if len(fb.clicked_pids) > 0:
             slates_clicked += 1
         total_clicks += len(fb.clicked_pids)
@@ -364,6 +410,13 @@ def run_single_policy_trace(
     cum_traj_oracle = cumulative_reward + cumulative_regret
     reg_share = cumulative_regret / max(1e-9, cum_traj_oracle)
 
+    x_q = np.arange(5, dtype=np.float64)
+    y_q2 = np.array(regrets_1k[5:10], dtype=np.float64) if len(regrets_1k) >= 10 else np.zeros(5)
+    y_q4 = np.array(regrets_1k[15:20], dtype=np.float64) if len(regrets_1k) >= 20 else np.zeros(5)
+    slope_q2 = float(np.polyfit(x_q, y_q2, 1)[0]) if len(y_q2) == 5 else 0.0
+    slope_q4 = float(np.polyfit(x_q, y_q4, 1)[0]) if len(y_q4) == 5 else 0.0
+    spike_ratio = float(quarter_regrets[2] / max(1e-6, quarter_regrets[1]))
+
     return {
         "policy": policy_name,
         "seed": seed,
@@ -375,6 +428,7 @@ def run_single_policy_trace(
         "alpha": alpha,
         "gamma": gamma,
         "n_cap": n_cap,
+        "code_hash": CONFIG_HASH,
         "config_hash": CONFIG_HASH,
         "cumulative_reward": float(cumulative_reward),
         "cumulative_regret": float(cumulative_regret),
@@ -392,6 +446,10 @@ def run_single_policy_trace(
         "post_drift_regret_half": float(post_drift_regret_half),
         "cold_user_regret": float(cold_user_regret_sum / max(1, cold_user_rounds)),
         "quarter_regrets": [float(q) for q in quarter_regrets],
+        "regrets_1k": [float(x) for x in regrets_1k],
+        "slope_q2": slope_q2,
+        "slope_q4": slope_q4,
+        "spike_ratio": spike_ratio,
         "new_product_exposure": float(cold_start_impressions / max(1, (horizon - drift_start) * 10)),
         "new_product_reward": float(new_item_reward),
         "new_product_regret": float(new_item_regret),
@@ -459,52 +517,57 @@ def load_unit(unit_id: str) -> Dict[str, Any]:
 
 def build_all_required_units() -> List[Tuple]:
     """
-    Constructs the list of all unit specifications required for Phase 12A:
-      1. Primary Benchmark (30 seeds, abrupt drift, medium, all 19 policies)
-      2. A1 Discounting Test Suite (30 seeds, no_drift & gradual_drift, 3 policies)
-      3. Part B Hybrids (30 seeds, no_drift & 3 misspecification modes, 5 new policies)
-      4. Part D Confounded (10 seeds, drift_only & new_products_only, 5 new policies)
-      5. Part F Warm-Start Sweep (15 seeds, n_cap in {500, 2000}, 2 policies)
+    Constructs the list of all unit specifications required for Phase 12A-2:
+      1. Primary Benchmark (30 seeds, abrupt drift, medium, all 26 policies)
+      2. A1 Discounting Test Suite (30 seeds, no_drift & gradual_drift, 4 policies)
+      3. Part B Hybrids in no_drift (30 seeds, 8 hybrids + Dept Heuristic + Oracle + Random)
+      4. Misspecification Suite (30 seeds, 3 misspecification modes, all 26 policies)
+      5. Confounded Scenarios (10 seeds, drift_only & new_products_only, all 26 policies)
+      6. Warm-Start Sweep (15 seeds, n_cap in {500, 2000}, 2 policies)
     """
     tasks = []
     alpha = 0.5
     gamma = 0.9995
 
-    # 1. Primary Benchmark (30 seeds, abrupt drift, medium, all 19 policies)
+    # 1. Primary Benchmark (30 seeds, abrupt drift, medium, all 26 policies)
     for pol in ALL_POLICIES_ORDERED:
         for s in PRIMARY_EVAL_SEEDS:
             uid = make_unit_id(pol, s, "abrupt_drift", "medium", None, False, True, 10000)
             tasks.append((pol, s, "medium", "abrupt", HORIZON, False, None, True, alpha, gamma, 10000, "abrupt_drift", uid))
 
-    # 2. A1 Discounting Test Suite (30 seeds, no_drift & gradual_drift, 3 policies)
-    a1_pols = ["Cold LinUCB", "Discounted LinUCB (gamma=0.9995)", "Discounted LinUCB (gamma=0.999)"]
+    # 2. A1 Discounting Test Suite (30 seeds, no_drift & gradual_drift, 4 policies)
+    a1_pols = ["Cold LinUCB", "Discounted LinUCB (gamma=0.9995)", "Discounted LinUCB (gamma=1.0)", "Discounted LinUCB (gamma=0.999)"]
     for scen in ["no_drift", "gradual_drift"]:
+        scen_env = "none" if scen == "no_drift" else "gradual"
         for pol in a1_pols:
             for s in PRIMARY_EVAL_SEEDS:
                 uid = make_unit_id(pol, s, scen, "medium", None, False, True, 10000)
-                tasks.append((pol, s, "medium", scen, HORIZON, False, None, True, alpha, gamma, 10000, scen, uid))
+                tasks.append((pol, s, "medium", scen_env, HORIZON, False, None, True, alpha, gamma, 10000, scen, uid))
 
-    # 3. Part B Hybrids (30 seeds, no_drift & 3 misspecifications, 5 new policies)
-    for pol in NEW_POLICIES:
-        # no_drift
-        for s in PRIMARY_EVAL_SEEDS:
-            uid = make_unit_id(pol, s, "no_drift", "medium", None, False, True, 10000)
-            tasks.append((pol, s, "medium", "none", HORIZON, False, None, True, alpha, gamma, 10000, "no_drift", uid))
-        # misspecifications
-        for m_mode in ["hidden_style", "nonlinear_interactions", "high_funnel_conversion"]:
+    # 3. Part B Hybrids in no_drift (30 seeds, 8 hybrids + Dept Heuristic + Oracle + Random)
+    h_no_drift_pols = list(HYBRID_POLICIES) + ["Department Heuristic", "Oracle", "Random"]
+    for pol in h_no_drift_pols:
+        if pol not in a1_pols:
+            for s in PRIMARY_EVAL_SEEDS:
+                uid = make_unit_id(pol, s, "no_drift", "medium", None, False, True, 10000)
+                tasks.append((pol, s, "medium", "none", HORIZON, False, None, True, alpha, gamma, 10000, "no_drift", uid))
+
+    # 4. Misspecification Suite (30 seeds, 3 misspecification modes, all 26 policies)
+    for m_mode in ["hidden_style", "nonlinear_interactions", "high_funnel_conversion"]:
+        for pol in ALL_POLICIES_ORDERED:
             for s in PRIMARY_EVAL_SEEDS:
                 uid = make_unit_id(pol, s, "abrupt_drift", "medium", m_mode, False, True, 10000)
                 tasks.append((pol, s, "medium", "abrupt", HORIZON, False, m_mode, True, alpha, gamma, 10000, "abrupt_drift", uid))
 
-    # 4. Part D Confounded for New Policies (10 seeds)
-    for pol in NEW_POLICIES:
+    # 5. Confounded Scenarios (10 seeds, drift_only & new_products_only, all 26 policies)
+    for pol in ALL_POLICIES_ORDERED:
         for s in GRID_EVAL_SEEDS:
             uid_d = make_unit_id(pol, s, "drift_only", "medium", None, False, False, 10000)
             tasks.append((pol, s, "medium", "abrupt", HORIZON, False, None, False, alpha, gamma, 10000, "drift_only", uid_d))
             uid_n = make_unit_id(pol, s, "new_products_only", "medium", None, False, True, 10000)
             tasks.append((pol, s, "medium", "none", HORIZON, False, None, True, alpha, gamma, 10000, "new_products_only", uid_n))
 
-    # 5. Part F Warm-Start Sweep (15 seeds, n_cap in {500, 2000})
+    # 6. Part F Warm-Start Sweep (15 seeds, n_cap in {500, 2000})
     for n_c in [500, 2000]:
         for s in range(1, 16):
             for pol in ["Warm LinUCB", "Warm LinTS"]:
@@ -656,6 +719,9 @@ def aggregate_policy_runs(runs: List[Dict[str, Any]]) -> Dict[str, Any]:
             "mean": float(np.mean(cold_u_reg))
         },
         "quarter_regrets": q_means,
+        "slope_q2": float(np.mean(np.array([r.get("slope_q2", 0.0) for r in runs], dtype=np.float64))),
+        "slope_q4": float(np.mean(np.array([r.get("slope_q4", 0.0) for r in runs], dtype=np.float64))),
+        "spike_ratio": float(np.mean(np.array([r.get("spike_ratio", 1.0) for r in runs], dtype=np.float64))),
         "new_product_exposure": {
             "mean": float(np.mean(new_exposures)),
             "std": float(np.std(new_exposures, ddof=1)) if n_seeds > 1 else 0.0
@@ -796,16 +862,69 @@ def validate_existing_units() -> Tuple[int, int, int]:
     return valid_count, corrupt_count, retest_passed
 
 
-def aggregate_master_results():
-    """Aggregates all cached unit results and existing data into master JSON."""
+def run_hyperparameter_tuning(workers: int = 4) -> Tuple[Dict[str, float], Dict[str, float], float, float]:
+    """Runs tuning sweep on TUNING_SEEDS = [101, 102, 103, 104, 105]."""
+    log("Running hyperparameter tuning on separate tuning seeds (101-105)...")
+    alpha_candidates = [0.1, 0.25, 0.5, 1.0]
+
+    tuning_tasks = []
+    for a in alpha_candidates:
+        for s in TUNING_SEEDS:
+            uid = f"tuning__alpha_{a}__s{s}"
+            if not is_unit_valid(uid):
+                tuning_tasks.append(("Cold LinUCB", s, "medium", "abrupt", HORIZON, False, None, True, a, 0.9995, 10000, "abrupt_drift", uid))
+
+    for g in GAMMA_CANDIDATES:
+        for s in TUNING_SEEDS:
+            uid = f"tuning__gamma_{g}__s{s}"
+            if not is_unit_valid(uid):
+                tuning_tasks.append((f"Discounted LinUCB (gamma={g})", s, "medium", "abrupt", HORIZON, False, None, True, 0.5, g, 10000, "abrupt_drift", uid))
+
+    if tuning_tasks:
+        log(f"Running {len(tuning_tasks)} tuning units across {workers} workers...")
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(execute_unit_worker, t): t for t in tuning_tasks}
+            for fut in as_completed(futures):
+                uid, res = fut.result()
+
+    alpha_sweep = {}
+    for a in alpha_candidates:
+        regs = [load_unit(f"tuning__alpha_{a}__s{s}")["cumulative_regret"] for s in TUNING_SEEDS]
+        alpha_sweep[str(a)] = float(np.mean(regs))
+
+    gamma_sweep = {}
+    for g in GAMMA_CANDIDATES:
+        regs = [load_unit(f"tuning__gamma_{g}__s{s}")["cumulative_regret"] for s in TUNING_SEEDS]
+        gamma_sweep[str(g)] = float(np.mean(regs))
+
+    best_alpha = float(min(alpha_sweep, key=alpha_sweep.get))
+    best_gamma = float(min(gamma_sweep, key=gamma_sweep.get))
+    log(f"Tuning completed: best_alpha={best_alpha}, best_gamma={best_gamma}")
+    return alpha_sweep, gamma_sweep, best_alpha, best_gamma
+
+
+def aggregate_master_results(tuning_data: Optional[Tuple] = None, workers: int = 4):
+    """Aggregates all cached unit results into master JSON."""
     log("Aggregating master benchmark results from unit files...")
 
-    # Load existing master results for baseline reference
-    existing_file = ROOT_DIR / "experiments" / "results" / "sim_v2_master_results.json"
-    existing_data = None
-    if existing_file.exists():
-        with open(existing_file, "r", encoding="utf-8") as f:
-            existing_data = json.load(f)
+    # Load legacy 12A master results for before/after comparison
+    legacy_file = ROOT_DIR / "experiments" / "results" / "sim_v2_master_results_legacy_12a.json"
+    legacy_data = None
+    if legacy_file.exists():
+        with open(legacy_file, "r", encoding="utf-8") as f:
+            legacy_data = json.load(f)
+
+    # Tuning
+    if tuning_data is not None:
+        alpha_sweep, gamma_sweep, best_alpha, best_gamma = tuning_data
+    elif legacy_data and "hyperparameter_tuning" in legacy_data and len(legacy_data["hyperparameter_tuning"].get("gamma_sweep", {})) == len(GAMMA_CANDIDATES):
+        t_sec = legacy_data["hyperparameter_tuning"]
+        alpha_sweep = t_sec["alpha_sweep"]
+        gamma_sweep = t_sec["gamma_sweep"]
+        best_alpha = t_sec["best_alpha"]
+        best_gamma = t_sec["best_gamma"]
+    else:
+        alpha_sweep, gamma_sweep, best_alpha, best_gamma = run_hyperparameter_tuning(workers=workers)
 
     # 1. Primary Benchmark
     primary_benchmark = {}
@@ -817,26 +936,42 @@ def aggregate_master_results():
                 runs.append(load_unit(uid))
         if len(runs) == len(PRIMARY_EVAL_SEEDS):
             primary_benchmark[pol] = aggregate_policy_runs(runs)
-        elif existing_data and pol in existing_data.get("primary_benchmark", {}):
-            agg = existing_data["primary_benchmark"][pol]
-            r_m = agg["cumulative_reward"]["mean"]
-            reg_m = agg["cumulative_regret"]["mean"]
-            traj = r_m + reg_m
-            agg["cumulative_trajectory_oracle_reward"] = {
-                "mean": float(traj),
-                "std": agg["cumulative_regret"]["std"],
-                "ci_95": [float(r_m + agg["cumulative_regret"]["ci_95"][0]),
-                          float(r_m + agg["cumulative_regret"]["ci_95"][1])]
-            }
-            agg["regret_share"] = {
-                "mean": float(reg_m / max(1e-9, traj)),
-                "ci_95": [float(agg["cumulative_regret"]["ci_95"][0] / max(1e-9, traj)),
-                          float(agg["cumulative_regret"]["ci_95"][1] / max(1e-9, traj))]
-            }
-            primary_benchmark[pol] = agg
+        else:
+            log(f"WARNING: Primary benchmark {pol} has only {len(runs)}/{len(PRIMARY_EVAL_SEEDS)} valid units")
 
-    # 2. Part A1: Dedicated Discounting Test Suite
-    a1_pols = ["Cold LinUCB", "Discounted LinUCB (gamma=0.9995)", "Discounted LinUCB (gamma=0.999)"]
+    # Add quarterly ratios to Random and trend classification rules
+    if "Random" in primary_benchmark:
+        r_quarters = primary_benchmark["Random"]["quarter_regrets"]
+        for pol, m in primary_benchmark.items():
+            m["quarter_ratios_to_random"] = [
+                float(q / max(1e-6, r_q)) for q, r_q in zip(m["quarter_regrets"], r_quarters)
+            ]
+            s_q2 = m.get("slope_q2", 0.0)
+            s_q4 = m.get("slope_q4", 0.0)
+            spk = m.get("spike_ratio", 1.0)
+            if s_q2 < -5.0 and s_q4 < -5.0:
+                m["trend_rule"] = f"Decelerating (Slope Q2={s_q2:.1f}, Q4={s_q4:.1f}, Spike={spk:.2f}x)"
+            elif spk > 1.25:
+                m["trend_rule"] = f"Drift Spike & Re-adapting (Slope Q2={s_q2:.1f}, Q4={s_q4:.1f}, Spike={spk:.2f}x)"
+            elif abs(s_q2) <= 5.0 and abs(s_q4) <= 5.0:
+                m["trend_rule"] = f"Stationary / Flat (Slope Q2={s_q2:.1f}, Q4={s_q4:.1f}, Spike={spk:.2f}x)"
+            else:
+                m["trend_rule"] = f"Dynamic (Slope Q2={s_q2:.1f}, Q4={s_q4:.1f}, Spike={spk:.2f}x)"
+
+    # 2. Gamma Evaluation Grid (Part A3)
+    gamma_grid_eval = {}
+    for g in GAMMA_CANDIDATES:
+        pol_name = f"Discounted LinUCB (gamma={g})"
+        if pol_name in primary_benchmark:
+            gamma_grid_eval[str(g)] = primary_benchmark[pol_name]
+
+    # 3. Dedicated Discounting Test Suite (Part A2)
+    a1_pols = [
+        f"Discounted LinUCB (gamma={best_gamma})",
+        "Discounted LinUCB (gamma=1.0)",
+        "Cold LinUCB",
+        "Discounted LinUCB (gamma=0.999)"
+    ]
     a1_scenarios = ["no_drift", "abrupt_drift", "gradual_drift"]
     a1_runs_by_key = {}
     for scen in a1_scenarios:
@@ -853,23 +988,29 @@ def aggregate_master_results():
     raw_p_a1 = []
     test_records = []
     comparisons = [
-        ("Discounted (gamma*=0.9995) vs Cold LinUCB", "Discounted LinUCB (gamma=0.9995)", "Cold LinUCB"),
-        ("Discounted (gamma=0.999, post-hoc) vs Cold LinUCB", "Discounted LinUCB (gamma=0.999)", "Cold LinUCB")
+        (f"Discounted (gamma*={best_gamma}) vs Discounted (gamma=1.0)", f"Discounted LinUCB (gamma={best_gamma})", "Discounted LinUCB (gamma=1.0)"),
+        (f"Discounted (gamma*={best_gamma}) vs Cold LinUCB", f"Discounted LinUCB (gamma={best_gamma})", "Cold LinUCB"),
+        ("Discounted (gamma=1.0) vs Cold LinUCB", "Discounted LinUCB (gamma=1.0)", "Cold LinUCB"),
+        ("Discounted (gamma=0.999) vs Cold LinUCB", "Discounted LinUCB (gamma=0.999)", "Cold LinUCB")
     ]
-    horizons = [
+    horizons_with_drift = [
         ("full_horizon", "Full Horizon [0, 20000)", lambda r: r["cumulative_regret"]),
         ("post_drift_1k", "Post-Drift 1,000 Rounds [10000, 11000)", lambda r: r["post_drift_regret_1k"]),
         ("post_drift_half", "Post-Drift Second Half [10000, 20000)", lambda r: r["post_drift_regret_half"])
     ]
+    horizons_no_drift = [
+        ("full_horizon", "Full Horizon [0, 20000)", lambda r: r["cumulative_regret"])
+    ]
 
     for scen in a1_scenarios:
         a1_test_suite["scenarios"][scen] = []
+        scen_horizons = horizons_no_drift if scen == "no_drift" else horizons_with_drift
         for comp_name, pol_a, pol_b in comparisons:
             runs_a = a1_runs_by_key.get((scen, pol_a), [])
             runs_b = a1_runs_by_key.get((scen, pol_b), [])
             if len(runs_a) >= 10 and len(runs_b) >= 10:
                 n_match = min(len(runs_a), len(runs_b))
-                for h_key, h_desc, extractor in horizons:
+                for h_key, h_desc, extractor in scen_horizons:
                     arr_a = np.array([extractor(r) for r in runs_a[:n_match]], dtype=np.float64)
                     arr_b = np.array([extractor(r) for r in runs_b[:n_match]], dtype=np.float64)
                     stat = compute_paired_statistics(arr_a, arr_b)
@@ -898,58 +1039,42 @@ def aggregate_master_results():
             rec["verdict"] = f"{rec['pol_a']} beats {rec['pol_b']} (statistically significant)"
         elif ci[0] > 0.0 and rec["p_value_holm"] < 0.05:
             rec["verdict"] = f"{rec['pol_b']} beats {rec['pol_a']} (statistically significant)"
+        elif (ci[1] < 0.0 or ci[0] > 0.0) and rec["p_value_holm"] >= 0.05:
+            rec["verdict"] = "Bootstrap CI excludes zero but Holm-corrected Wilcoxon is not significant"
         else:
             rec["verdict"] = "Interval spans zero / No significant difference"
 
-    # 3. Confounded Scenarios (Part D)
-    confounded_results = existing_data.get("confounded_scenarios", {}) if existing_data else {"drift_only": {}, "new_products_only": {}, "both": {}}
+    # 4. Confounded Scenarios (Part D)
+    confounded_results = {"drift_only": {}, "new_products_only": {}, "both": {}}
     for pol in ALL_POLICIES_ORDERED:
-        # drift_only
         d_runs = [load_unit(make_unit_id(pol, s, "drift_only", "medium", None, False, False, 10000))
                   for s in GRID_EVAL_SEEDS if is_unit_valid(make_unit_id(pol, s, "drift_only", "medium", None, False, False, 10000))]
         if len(d_runs) == len(GRID_EVAL_SEEDS):
             confounded_results["drift_only"][pol] = aggregate_policy_runs(d_runs)
 
-        # new_products_only
         n_runs = [load_unit(make_unit_id(pol, s, "new_products_only", "medium", None, False, True, 10000))
                   for s in GRID_EVAL_SEEDS if is_unit_valid(make_unit_id(pol, s, "new_products_only", "medium", None, False, True, 10000))]
         if len(n_runs) == len(GRID_EVAL_SEEDS):
             confounded_results["new_products_only"][pol] = aggregate_policy_runs(n_runs)
 
-    # Both (Primary) reproduces headline primary benchmark identically
-    confounded_results["both"] = {}
-    for pol in ALL_POLICIES_ORDERED:
         if pol in primary_benchmark:
             confounded_results["both"][pol] = primary_benchmark[pol]
 
-    # 4. Misspecification Robustness (Part E)
-    misspec_results = existing_data.get("misspecification_robustness", {}) if existing_data else {}
+    # 5. Misspecification Robustness (Part A4 / Part E)
+    misspec_results = {}
     for m_mode in ["hidden_style", "nonlinear_interactions", "high_funnel_conversion"]:
-        misspec_results.setdefault(m_mode, {})
+        misspec_results[m_mode] = {}
         for pol in ALL_POLICIES_ORDERED:
             m_runs = [load_unit(make_unit_id(pol, s, "abrupt_drift", "medium", m_mode, False, True, 10000))
                       for s in PRIMARY_EVAL_SEEDS if is_unit_valid(make_unit_id(pol, s, "abrupt_drift", "medium", m_mode, False, True, 10000))]
             if len(m_runs) == len(PRIMARY_EVAL_SEEDS):
                 misspec_results[m_mode][pol] = aggregate_policy_runs(m_runs)
-            elif pol in misspec_results[m_mode]:
-                agg = misspec_results[m_mode][pol]
-                r_m = agg["cumulative_reward"]["mean"]
-                reg_m = agg["cumulative_regret"]["mean"]
-                traj = r_m + reg_m
-                agg["cumulative_trajectory_oracle_reward"] = {
-                    "mean": float(traj),
-                    "std": agg["cumulative_regret"]["std"],
-                    "ci_95": [float(r_m + agg["cumulative_regret"]["ci_95"][0]),
-                              float(r_m + agg["cumulative_regret"]["ci_95"][1])]
-                }
-                agg["regret_share"] = {
-                    "mean": float(reg_m / max(1e-9, traj)),
-                    "ci_95": [float(agg["cumulative_regret"]["ci_95"][0] / max(1e-9, traj)),
-                              float(agg["cumulative_regret"]["ci_95"][1] / max(1e-9, traj))]
-                }
 
-    # 5. Warm-Start Sweep (Part F)
-    warm_sweep_results = existing_data.get("warm_start_sweep", {}) if existing_data else {"Warm LinUCB": {}, "Warm LinTS": {}}
+        if "Oracle" in misspec_results[m_mode]:
+            misspec_results[m_mode]["oracle_expected_reward"] = misspec_results[m_mode]["Oracle"]["cumulative_reward"]["mean"]
+
+    # 6. Warm-Start Sweep (Part F)
+    warm_sweep_results = {"Warm LinUCB": {}, "Warm LinTS": {}}
     for n_c in [500, 2000]:
         for pol in ["Warm LinUCB", "Warm LinTS"]:
             w_runs = [load_unit(make_unit_id(pol, s, "abrupt_drift", "medium", None, False, True, n_c))
@@ -958,15 +1083,23 @@ def aggregate_master_results():
                 warm_sweep_results[pol][n_c] = aggregate_policy_runs(w_runs)
 
     # EXACT DETERMINISM: N_cap=0 matches Cold LinUCB/TS identically!
-    warm_sweep_results["Warm LinUCB"][0] = primary_benchmark["Cold LinUCB"]
-    warm_sweep_results["Warm LinTS"][0] = primary_benchmark["Cold LinTS"]
-    warm_sweep_results["Warm LinUCB"][10000] = primary_benchmark["Warm LinUCB"]
-    warm_sweep_results["Warm LinTS"][10000] = primary_benchmark["Warm LinTS"]
+    if "Cold LinUCB" in primary_benchmark:
+        warm_sweep_results["Warm LinUCB"][0] = primary_benchmark["Cold LinUCB"]
+        warm_sweep_results["Warm LinUCB"]["0"] = primary_benchmark["Cold LinUCB"]
+    if "Cold LinTS" in primary_benchmark:
+        warm_sweep_results["Warm LinTS"][0] = primary_benchmark["Cold LinTS"]
+        warm_sweep_results["Warm LinTS"]["0"] = primary_benchmark["Cold LinTS"]
+    if "Warm LinUCB" in primary_benchmark:
+        warm_sweep_results["Warm LinUCB"][10000] = primary_benchmark["Warm LinUCB"]
+        warm_sweep_results["Warm LinUCB"]["10000"] = primary_benchmark["Warm LinUCB"]
+    if "Warm LinTS" in primary_benchmark:
+        warm_sweep_results["Warm LinTS"][10000] = primary_benchmark["Warm LinTS"]
+        warm_sweep_results["Warm LinTS"]["10000"] = primary_benchmark["Warm LinTS"]
 
-    # 6. Paired Hypothesis Tests
-    paired_tests_results = {}
+    # 7. Paired Hypothesis Tests & Part B3 Hybrid Tests
+    paired_tests_results = {"medium": [], "by_environment": {}}
     headline_specs = [
-        ("Discounted (gamma*=0.9995) vs Cold LinUCB", "Discounted LinUCB (gamma=0.9995)", "Cold LinUCB"),
+        ("Discounted (gamma*=0.9995) vs Cold LinUCB", f"Discounted LinUCB (gamma={best_gamma})", "Cold LinUCB"),
         ("Discounted (gamma=0.999) vs Cold LinUCB", "Discounted LinUCB (gamma=0.999)", "Cold LinUCB"),
         ("Warm vs Cold LinUCB", "Warm LinUCB", "Cold LinUCB"),
         ("Warm vs Cold LinTS", "Warm LinTS", "Cold LinTS"),
@@ -982,10 +1115,19 @@ def aggregate_master_results():
         ("Department Heuristic vs Dept-Prior LinUCB (w=0.5)", "Department Heuristic", "Dept-Prior LinUCB (w=0.5)"),
         ("Department Heuristic vs Slate Mixing (k=3 Dept + LinUCB)", "Department Heuristic", "Slate Mixing (k=3 Dept + LinUCB)"),
         ("Department Heuristic vs Slate Mixing (k=5 Dept + LinUCB)", "Department Heuristic", "Slate Mixing (k=5 Dept + LinUCB)"),
-        ("Department Heuristic vs Residual LinUCB", "Department Heuristic", "Residual LinUCB")
+        ("Department Heuristic vs Residual LinUCB", "Department Heuristic", "Residual LinUCB"),
+        # Two-stage hybrids vs Dept Heuristic
+        ("Department Heuristic vs Dept-Restricted LinUCB (Cold)", "Department Heuristic", "Dept-Restricted LinUCB (Cold)"),
+        ("Department Heuristic vs Dept-Restricted LinUCB (Discounted)", "Department Heuristic", "Dept-Restricted LinUCB (Discounted)"),
+        ("Department Heuristic vs Dept-Restricted LinUCB + Expl (Cold, m=2)", "Department Heuristic", "Dept-Restricted LinUCB + Expl (Cold, m=2)"),
+        ("Department Heuristic vs Dept-Restricted LinUCB + Expl (Discounted, m=2)", "Department Heuristic", "Dept-Restricted LinUCB + Expl (Discounted, m=2)"),
+        # Two-stage hybrids vs Cold LinUCB
+        ("Cold LinUCB vs Dept-Restricted LinUCB (Cold)", "Cold LinUCB", "Dept-Restricted LinUCB (Cold)"),
+        ("Cold LinUCB vs Dept-Restricted LinUCB (Discounted)", "Cold LinUCB", "Dept-Restricted LinUCB (Discounted)"),
+        ("Cold LinUCB vs Dept-Restricted LinUCB + Expl (Cold, m=2)", "Cold LinUCB", "Dept-Restricted LinUCB + Expl (Cold, m=2)"),
+        ("Cold LinUCB vs Dept-Restricted LinUCB + Expl (Discounted, m=2)", "Cold LinUCB", "Dept-Restricted LinUCB + Expl (Discounted, m=2)")
     ]
 
-    paired_tests_results["medium"] = []
     raw_p_list = []
     for name, pol_a, pol_b in headline_specs:
         if pol_a in primary_benchmark and pol_b in primary_benchmark:
@@ -1011,10 +1153,80 @@ def aggregate_master_results():
             item["verdict"] = f"{item['pol_a']} beats {item['pol_b']} (statistically significant)"
         elif ci[0] > 0.0 and item["p_value_holm"] < 0.05:
             item["verdict"] = f"{item['pol_b']} beats {item['pol_a']} (statistically significant)"
+        elif (ci[1] < 0.0 or ci[0] > 0.0) and item["p_value_holm"] >= 0.05:
+            item["verdict"] = "Bootstrap CI excludes zero but Holm-corrected Wilcoxon is not significant"
         else:
             item["verdict"] = "Interval spans zero / No significant difference"
 
-    # Calibration
+    # Part B3 Environment paired tests: base, no_drift, nonlinear_interactions, hidden_style
+    env_dicts = {
+        "base": primary_benchmark,
+        "nonlinear_interactions": misspec_results.get("nonlinear_interactions", {}),
+        "hidden_style": misspec_results.get("hidden_style", {})
+    }
+    # Load no_drift for hybrids
+    no_drift_dict = {}
+    for pol in (list(HYBRID_POLICIES) + ["Department Heuristic", "Cold LinUCB", "Oracle", "Random"]):
+        nd_runs = [load_unit(make_unit_id(pol, s, "no_drift", "medium", None, False, True, 10000))
+                   for s in PRIMARY_EVAL_SEEDS if is_unit_valid(make_unit_id(pol, s, "no_drift", "medium", None, False, True, 10000))]
+        if len(nd_runs) == len(PRIMARY_EVAL_SEEDS):
+            no_drift_dict[pol] = aggregate_policy_runs(nd_runs)
+    env_dicts["no_drift"] = no_drift_dict
+
+    for env_name, env_pols in env_dicts.items():
+        paired_tests_results["by_environment"][env_name] = []
+        raw_p_env = []
+        env_records = []
+        if "Department Heuristic" in env_pols and "Cold LinUCB" in env_pols:
+            for hyb in HYBRID_POLICIES:
+                if hyb in env_pols:
+                    arr_h = np.array(env_pols[hyb]["cumulative_regret"]["values"])
+                    arr_dh = np.array(env_pols["Department Heuristic"]["cumulative_regret"]["values"])
+                    arr_cl = np.array(env_pols["Cold LinUCB"]["cumulative_regret"]["values"])
+
+                    # vs Dept Heuristic
+                    st_dh = compute_paired_statistics(arr_h, arr_dh)
+                    raw_p_env.append(st_dh["p_value_raw"])
+                    rec_dh = {
+                        "test": f"{hyb} vs Department Heuristic",
+                        "pol_a": hyb,
+                        "pol_b": "Department Heuristic",
+                        "mean_diff": st_dh["mean_diff"],
+                        "ci_95": st_dh["ci_95"],
+                        "cohen_d": st_dh["cohen_d"],
+                        "p_value_raw": st_dh["p_value_raw"]
+                    }
+                    env_records.append(rec_dh)
+
+                    # vs Cold LinUCB
+                    st_cl = compute_paired_statistics(arr_h, arr_cl)
+                    raw_p_env.append(st_cl["p_value_raw"])
+                    rec_cl = {
+                        "test": f"{hyb} vs Cold LinUCB",
+                        "pol_a": hyb,
+                        "pol_b": "Cold LinUCB",
+                        "mean_diff": st_cl["mean_diff"],
+                        "ci_95": st_cl["ci_95"],
+                        "cohen_d": st_cl["cohen_d"],
+                        "p_value_raw": st_cl["p_value_raw"]
+                    }
+                    env_records.append(rec_cl)
+
+        holm_p_env = apply_holm_bonferroni(raw_p_env)
+        for i, rec in enumerate(env_records):
+            rec["p_value_holm"] = holm_p_env[i]
+            ci = rec["ci_95"]
+            if ci[1] < 0.0 and rec["p_value_holm"] < 0.05:
+                rec["verdict"] = f"{rec['pol_a']} beats {rec['pol_b']} (statistically significant)"
+            elif ci[0] > 0.0 and rec["p_value_holm"] < 0.05:
+                rec["verdict"] = f"{rec['pol_b']} beats {rec['pol_a']} (statistically significant)"
+            elif (ci[1] < 0.0 or ci[0] > 0.0) and rec["p_value_holm"] >= 0.05:
+                rec["verdict"] = "Bootstrap CI excludes zero but Holm-corrected Wilcoxon is not significant"
+            else:
+                rec["verdict"] = "Interval spans zero / No significant difference"
+            paired_tests_results["by_environment"][env_name].append(rec)
+
+    # 8. Calibration
     calibration_metrics = {}
     for diff in ["easy", "medium", "hard"]:
         cal = EnvironmentV2.get_calibration_metrics(difficulty=diff, n_rounds=4000, seed=42)
@@ -1026,16 +1238,45 @@ def aggregate_master_results():
         "to ~6.97% compared to ~5.23% at sigma=0.15."
     )
 
+    # 9. Before / After Comparison Table (Part A1)
+    before_after = {}
+    if legacy_data and "primary_benchmark" in legacy_data:
+        legacy_primary = legacy_data["primary_benchmark"]
+        key_compare = [
+            "Department Heuristic",
+            "Cold LinUCB",
+            f"Discounted LinUCB (gamma={best_gamma})",
+            "Discounted LinUCB (gamma=1.0)",
+            "Warm LinUCB",
+            "Cold LinTS",
+            "Warm LinTS",
+            "Slate Mixing (k=5 Dept + LinUCB)",
+            "Residual LinUCB",
+            "Oracle",
+            "Random"
+        ]
+        for pol in key_compare:
+            if pol in primary_benchmark:
+                val_fresh = primary_benchmark[pol]["cumulative_regret"]["mean"]
+                val_legacy = legacy_primary.get(pol, {}).get("cumulative_regret", {}).get("mean", None)
+                diff = (val_fresh - val_legacy) if val_legacy is not None else None
+                before_after[pol] = {
+                    "phase12a_legacy": val_legacy,
+                    "phase12a2_authoritative": val_fresh,
+                    "difference": diff,
+                    "status": "Authoritative Ground Truth (Phase 12A-2)"
+                }
+
     # Master results dict
     master_results = {
         "metadata": {
-            "phase": "12A",
+            "phase": "12A-2",
             "active_catalog_size": 262,
             "feature_dim": 36,
             "feature_spec_hash": "75f60ed70b2a",
             "horizon": HORIZON,
-            "best_alpha": 0.5,
-            "best_gamma": 0.9995,
+            "best_alpha": best_alpha,
+            "best_gamma": best_gamma,
             "n_eval_seeds_primary": len(PRIMARY_EVAL_SEEDS),
             "n_eval_seeds_grid": len(GRID_EVAL_SEEDS),
             "trajectory_oracle_reward_identity": "Reward(pi) + Regret(pi) == Trajectory Oracle Expected Reward(pi)",
@@ -1047,25 +1288,25 @@ def aggregate_master_results():
             "runtime_seconds": 0.0
         },
         "hyperparameter_tuning": {
-            "alpha_sweep": {"0.1": 1498.08, "0.25": 1593.11, "0.5": 1478.25, "1.0": 1512.18},
-            "gamma_sweep": {"0.999": 1458.89, "0.9995": 1396.24, "0.9999": 1439.77, "1.0": 1405.40},
-            "best_alpha": 0.5,
-            "best_gamma": 0.9995,
+            "alpha_sweep": alpha_sweep,
+            "gamma_sweep": gamma_sweep,
+            "best_alpha": best_alpha,
+            "best_gamma": best_gamma,
             "tuning_explanation": (
-                "In Phase 11, sequential evaluation used a shared user manager across policies, altering the sequence "
-                "of user histories and user interactions across sweeps, whereas in Phase 11B/12A each evaluation runs "
-                "in strict environment isolation under common random numbers. Tuning across isolated runs on seeds 101-105 "
-                "selected alpha* = 0.5 (lower cumulative regret than 0.25) and gamma* = 0.9995 (faster adaptation to abrupt drift than 0.9999)."
+                "Hyperparameter tuning on independent seeds 101-105 under strict environment isolation selected "
+                f"alpha* = {best_alpha} and gamma* = {best_gamma} across the 7-value candidate grid "
+                "{0.99, 0.995, 0.998, 0.999, 0.9995, 0.9999, 1.0}."
             )
         },
         "calibration_per_difficulty": calibration_metrics,
         "primary_benchmark": primary_benchmark,
+        "gamma_grid_evaluation": gamma_grid_eval,
         "a1_discounting_tests": a1_test_suite,
-        "grid_benchmark": existing_data.get("grid_benchmark", {}) if existing_data else {},
         "paired_tests": paired_tests_results,
         "confounded_scenarios": confounded_results,
         "misspecification_robustness": misspec_results,
-        "warm_start_sweep": warm_sweep_results
+        "warm_start_sweep": warm_sweep_results,
+        "before_after_comparison": before_after
     }
 
     # Atomic write to master results
@@ -1098,7 +1339,7 @@ def main():
         return
 
     if args.aggregate_only:
-        aggregate_master_results()
+        aggregate_master_results(workers=args.workers)
         return
 
     # 1. Build all required units
@@ -1132,12 +1373,15 @@ def main():
         log("Dry run complete. No units executed.")
         return
 
+    # 3. Run hyperparameter tuning on separate tuning seeds 101-105
+    tuning_data = run_hyperparameter_tuning(workers=args.workers)
+
     if not filtered_tasks:
         log("All requested units are already complete!")
-        aggregate_master_results()
+        aggregate_master_results(tuning_data=tuning_data, workers=args.workers)
         return
 
-    # 3. Execute missing units in parallel with ETA tracking
+    # 4. Execute missing units in parallel with ETA tracking
     workers = args.workers
     log(f"Launching execution of {len(filtered_tasks)} units across {workers} parallel worker processes...")
 
@@ -1157,7 +1401,7 @@ def main():
                 avg_time = elapsed / completed
                 rem_seconds = avg_time * (total_to_run - completed)
                 rem_mins = rem_seconds / 60.0
-                if completed % 10 == 0 or completed == total_to_run:
+                if completed % 25 == 0 or completed == total_to_run:
                     log(f"Progress: [{completed}/{total_to_run}] ({completed/total_to_run*100:.1f}%) | "
                         f"Unit: {unit_id} | Regret: {res['cumulative_regret']:.1f} | ETA: {rem_mins:.1f} min")
             except Exception as e:
@@ -1167,8 +1411,8 @@ def main():
     total_time = time.time() - start_time
     log(f"Batch completed in {total_time:.2f}s ({total_time/60.0:.2f} minutes).")
 
-    # 4. Aggregate master results
-    aggregate_master_results()
+    # 5. Aggregate master results
+    aggregate_master_results(tuning_data=tuning_data, workers=args.workers)
 
 
 if __name__ == "__main__":

@@ -317,28 +317,22 @@ class ColdLinUCBPolicy(BasePolicy):
         ucb_bonuses = self.alpha * np.sqrt(variances)
 
         ucb_scores = expected_rewards + ucb_bonuses
-        top_k_idx = np.argsort(-ucb_scores)[:k]
+        top_k_idx = np.argsort(-ucb_scores, kind="stable")[:k]
         return [available_pids[i] for i in top_k_idx]
 
     def update(self, feedback: SlateFeedback) -> None:
         reward_map = {ev["pid"]: ev["reward"] for ev in feedback.events}
-        for pos, pid in enumerate(feedback.slate_pids):
-            phi = feedback.feature_matrix[pos]
-            r = reward_map.get(pid, 0.0)
+        Phi = feedback.feature_matrix[:len(feedback.slate_pids)]
+        r_vec = np.array([reward_map.get(pid, 0.0) for pid in feedback.slate_pids], dtype=np.float64)
 
-            self.A += np.outer(phi, phi)
-            w = self.A_inv @ phi
-            denom = 1.0 + float(np.dot(phi, w))
-            if abs(denom) > 1e-12:
-                self.A_inv -= np.outer(w, w) / denom
-            self.b += r * phi
-            self.n_updates += 1
+        self.A += Phi.T @ Phi
+        self.b += Phi.T @ r_vec
+        self.n_updates += len(feedback.slate_pids)
 
-            if self.n_updates % 1000 == 0:
-                try:
-                    self.A_inv = np.linalg.inv(self.A)
-                except np.linalg.LinAlgError:
-                    pass
+        try:
+            self.A_inv = np.linalg.inv(self.A)
+        except np.linalg.LinAlgError:
+            self.A_inv = np.linalg.pinv(self.A)
 
 
 class WarmLinUCBPolicy(BasePolicy):
@@ -412,28 +406,22 @@ class WarmLinUCBPolicy(BasePolicy):
         ucb_bonuses = self.alpha * np.sqrt(variances)
 
         ucb_scores = expected_rewards + ucb_bonuses
-        top_k_idx = np.argsort(-ucb_scores)[:k]
+        top_k_idx = np.argsort(-ucb_scores, kind="stable")[:k]
         return [available_pids[i] for i in top_k_idx]
 
     def update(self, feedback: SlateFeedback) -> None:
         reward_map = {ev["pid"]: ev["reward"] for ev in feedback.events}
-        for pos, pid in enumerate(feedback.slate_pids):
-            phi = feedback.feature_matrix[pos]
-            r = reward_map.get(pid, 0.0)
+        Phi = feedback.feature_matrix[:len(feedback.slate_pids)]
+        r_vec = np.array([reward_map.get(pid, 0.0) for pid in feedback.slate_pids], dtype=np.float64)
 
-            self.A += np.outer(phi, phi)
-            w = self.A_inv @ phi
-            denom = 1.0 + float(np.dot(phi, w))
-            if abs(denom) > 1e-12:
-                self.A_inv -= np.outer(w, w) / denom
-            self.b += r * phi
-            self.n_updates += 1
+        self.A += Phi.T @ Phi
+        self.b += Phi.T @ r_vec
+        self.n_updates += len(feedback.slate_pids)
 
-            if self.n_updates % 1000 == 0:
-                try:
-                    self.A_inv = np.linalg.inv(self.A)
-                except np.linalg.LinAlgError:
-                    pass
+        try:
+            self.A_inv = np.linalg.inv(self.A)
+        except np.linalg.LinAlgError:
+            self.A_inv = np.linalg.pinv(self.A)
 
 
 class ColdLinTSPolicy(BasePolicy):
@@ -655,7 +643,7 @@ class DiscountedLinUCBPolicy(BasePolicy):
         ucb_bonuses = self.alpha * np.sqrt(variances)
 
         ucb_scores = expected_rewards + ucb_bonuses
-        top_k_idx = np.argsort(-ucb_scores)[:k]
+        top_k_idx = np.argsort(-ucb_scores, kind="stable")[:k]
         return [available_pids[i] for i in top_k_idx]
 
     def update(self, feedback: SlateFeedback) -> None:
@@ -663,8 +651,12 @@ class DiscountedLinUCBPolicy(BasePolicy):
         Phi = feedback.feature_matrix[:len(feedback.slate_pids)]
         r_vec = np.array([reward_map.get(pid, 0.0) for pid in feedback.slate_pids], dtype=np.float64)
 
-        self.A = self.gamma * self.A + (1.0 - self.gamma) * self.lambda_reg * np.eye(self.feature_dim) + (Phi.T @ Phi)
-        self.b = self.gamma * self.b + (Phi.T @ r_vec)
+        if self.gamma >= 1.0:
+            self.A += Phi.T @ Phi
+            self.b += Phi.T @ r_vec
+        else:
+            self.A = self.gamma * self.A + (1.0 - self.gamma) * self.lambda_reg * np.eye(self.feature_dim) + (Phi.T @ Phi)
+            self.b = self.gamma * self.b + (Phi.T @ r_vec)
         self.n_updates += len(feedback.slate_pids)
 
         try:
@@ -823,22 +815,29 @@ class ProductionPipelineWrapper(BasePolicy):
 class DeptPriorLinUCBPolicy(ColdLinUCBPolicy):
     """
     Department-Prior LinUCB:
-    Initializes b with a fixed inductive prior on category and brand affinity features
-    chosen on principle ('users prefer categories and brands they engage with'),
-    with strength tuned on tuning seeds (w=0.5).
+    Initializes A and b with an inductive prior on category and brand affinity features,
+    with prior strength N_prior = 100.0 tuned on tuning seeds.
     """
 
-    def __init__(self, alpha: float = 0.5, lambda_reg: float = 1.0, prior_weight: float = 0.5, feature_dim: int = 36):
+    def __init__(self, alpha: float = 0.5, lambda_reg: float = 1.0, prior_weight: float = 0.5, prior_strength: float = 100.0, feature_dim: int = 36):
         self.prior_weight = float(prior_weight)
+        self.prior_strength = float(prior_strength)
         super().__init__(alpha=alpha, lambda_reg=lambda_reg, feature_dim=feature_dim)
         self.name = f"Dept-Prior LinUCB (w={prior_weight})"
         self.reset()
 
     def reset(self, seed: Optional[int] = None) -> None:
         super().reset(seed)
-        if hasattr(self, "prior_weight"):
-            self.b[0:6] = self.prior_weight
-            self.b[6] = self.prior_weight * 0.5
+        if hasattr(self, "prior_weight") and hasattr(self, "prior_strength"):
+            for c in range(6):
+                self.A[c, c] += self.prior_strength
+                self.b[c] += self.prior_strength * self.prior_weight
+            self.A[6, 6] += self.prior_strength
+            self.b[6] += self.prior_strength * (self.prior_weight * 0.5)
+            try:
+                self.A_inv = np.linalg.inv(self.A)
+            except np.linalg.LinAlgError:
+                self.A_inv = np.linalg.pinv(self.A)
 
 
 class SlateMixingPolicy(BasePolicy):
@@ -900,12 +899,14 @@ class ResidualLinUCBPolicy(ColdLinUCBPolicy):
     Residual LinUCB Hybrid:
     Scores items with a base Department Heuristic offset, while LinUCB learns residual
     personalization and exploration adjustments.
+    Updates on the residual reward: r_residual = r - h_offset.
     """
 
     def __init__(self, alpha: float = 0.5, lambda_reg: float = 1.0, scale: float = 0.05, feature_dim: int = 36):
         super().__init__(alpha=alpha, lambda_reg=lambda_reg, feature_dim=feature_dim)
         self.name = "Residual LinUCB"
         self.scale = scale
+        self.last_offsets: Dict[int, float] = {}
 
     def _get_heuristic_offsets(
         self,
@@ -925,8 +926,8 @@ class ResidualLinUCBPolicy(ColdLinUCBPolicy):
         offsets = np.zeros(len(available_pids), dtype=np.float64)
         for i, pid in enumerate(available_pids):
             p = env.products[env.pid_to_index[pid]]
-            match_boost = 2.0 if p["category"] == target_cat else 0.0
-            offsets[i] = (match_boost + p["popularity_score"] * 0.1) * self.scale
+            match_boost = 0.35 if p["category"] == target_cat else 0.0
+            offsets[i] = match_boost + (p["popularity_score"] / 100.0) * 0.05
         return offsets
 
     def select_slate(
@@ -951,5 +952,123 @@ class ResidualLinUCBPolicy(ColdLinUCBPolicy):
         ucb_scores = mean_rewards + self.alpha * np.sqrt(np.maximum(1e-8, variances))
         combined_scores = ucb_scores + h_offsets
 
-        top_k_idx = np.argsort(-combined_scores)[:k]
-        return [available_pids[i] for i in top_k_idx]
+        top_k_idx = np.argsort(-combined_scores, kind="stable")[:k]
+        chosen_pids = [available_pids[i] for i in top_k_idx]
+        self.last_offsets = {available_pids[i]: float(h_offsets[i]) for i in top_k_idx}
+        return chosen_pids
+
+    def update(self, feedback: SlateFeedback) -> None:
+        reward_map = {ev["pid"]: ev["reward"] for ev in feedback.events}
+        Phi = feedback.feature_matrix[:len(feedback.slate_pids)]
+        r_res = np.array([reward_map.get(pid, 0.0) - self.last_offsets.get(pid, 0.0) for pid in feedback.slate_pids], dtype=np.float64)
+
+        self.A += Phi.T @ Phi
+        self.b += Phi.T @ r_res
+        self.n_updates += len(feedback.slate_pids)
+
+        try:
+            self.A_inv = np.linalg.inv(self.A)
+        except np.linalg.LinAlgError:
+            self.A_inv = np.linalg.pinv(self.A)
+
+
+class DeptRestrictedLinUCBPolicy(BasePolicy):
+    """
+    Two-Stage Hybrid (Department-Restricted LinUCB):
+      Stage 1 (Candidate Generation):
+        Identifies the user's target department c* using the same deterministic rule
+        as DepartmentHeuristicPolicy (most recently engaged category if available,
+        otherwise highest affinity category). Retrieves candidates from c*.
+      Stage 2 (Bandit Ranking):
+        Ranks department candidates using a contextual bandit (Cold LinUCB with alpha*
+        or Discounted LinUCB with gamma*).
+      Exploration Quota:
+        If m_explore > 0, reserves m_explore slots in the slate for cross-department
+        exploration (highest bandit score items outside c*), while 10 - m_explore slots
+        come strictly from c*.
+    """
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        base_bandit: Optional[BasePolicy] = None,
+        m_explore: int = 0,
+        alpha: float = 0.5,
+        gamma: float = 0.9995
+    ):
+        if base_bandit is not None:
+            self.bandit = base_bandit
+        else:
+            self.bandit = ColdLinUCBPolicy(alpha=alpha)
+        self.m_explore = m_explore
+
+        if name:
+            policy_name = name
+        elif m_explore > 0:
+            b_type = "Discounted" if isinstance(self.bandit, DiscountedLinUCBPolicy) else "Cold"
+            policy_name = f"Dept-Restricted LinUCB + Expl ({b_type}, m={m_explore})"
+        else:
+            b_type = "Discounted" if isinstance(self.bandit, DiscountedLinUCBPolicy) else "Cold"
+            policy_name = f"Dept-Restricted LinUCB ({b_type})"
+
+        super().__init__(policy_name)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        self.bandit.reset(seed)
+
+    def select_slate(
+        self,
+        env: EnvironmentV2,
+        user: UserInstance,
+        user_context: UserContext,
+        available_pids: List[int],
+        round_idx: int,
+        k: int = 10,
+        feature_matrix: Optional[np.ndarray] = None
+    ) -> List[int]:
+        # Stage 1: Department selection (exact Department Heuristic rule)
+        target_cat = None
+        if user.history:
+            last_pid = user.history[-1][0]
+            if last_pid in env.pid_to_index:
+                target_cat = env.products[env.pid_to_index[last_pid]]["category"]
+        if not target_cat:
+            target_cat = max(user_context.category_affinities.items(), key=lambda x: x[1])[0]
+
+        dept_pids = [pid for pid in available_pids if env.products[env.pid_to_index[pid]]["category"] == target_cat]
+        other_pids = [pid for pid in available_pids if env.products[env.pid_to_index[pid]]["category"] != target_cat]
+
+        m = min(self.m_explore, k)
+        k_dept = k - m
+
+        # Stage 2: Bandit ranking
+        slate_dept = []
+        if dept_pids:
+            slate_dept = self.bandit.select_slate(
+                env=env,
+                user=user,
+                user_context=user_context,
+                available_pids=dept_pids,
+                round_idx=round_idx,
+                k=k_dept,
+                feature_matrix=feature_matrix
+            )
+
+        slate_expl = []
+        needed_expl = k - len(slate_dept)
+        if needed_expl > 0 and other_pids:
+            slate_expl = self.bandit.select_slate(
+                env=env,
+                user=user,
+                user_context=user_context,
+                available_pids=other_pids,
+                round_idx=round_idx,
+                k=needed_expl,
+                feature_matrix=feature_matrix
+            )
+
+        return slate_dept + slate_expl
+
+    def update(self, feedback: SlateFeedback) -> None:
+        self.bandit.update(feedback)
+

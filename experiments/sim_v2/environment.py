@@ -16,6 +16,7 @@ Implements:
 
 from typing import Dict, List, Set, Tuple, Any, Optional
 import math
+import hashlib
 import numpy as np
 from sqlalchemy.orm import Session
 
@@ -247,8 +248,8 @@ class EnvironmentV2:
             # 21: Popularity score
             self.static_features[i, 21] = max(0.0, min(1.0, p["popularity_score"] / 100.0))
 
-            # 22 - 29: Brand hash bucket
-            bucket = abs(hash(p["brand"])) % 8
+            # 22 - 29: Brand hash bucket (deterministic SHA256 modulo 8 across processes)
+            bucket = int(hashlib.sha256(p["brand"].encode("utf-8")).hexdigest()[:8], 16) % 8
             self.static_features[i, 22 + bucket] = 1.0
 
             # 30: New product flag
