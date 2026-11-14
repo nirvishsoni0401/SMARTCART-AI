@@ -9,11 +9,6 @@ export default function RecentlyViewedRow({ title = "Recently Viewed" }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Hidden when consent is declined
-  if (user && user.consent_tracking === false) {
-    return null;
-  }
-
   const fetchRecentlyViewed = async () => {
     setLoading(true);
     const sessionId = localStorage.getItem('smartcart_session_id');
@@ -29,8 +24,18 @@ export default function RecentlyViewedRow({ title = "Recently Viewed" }) {
   };
 
   useEffect(() => {
+    if (user && user.consent_tracking === false) {
+      setLoading(false);
+      setProducts([]);
+      return;
+    }
     fetchRecentlyViewed();
   }, [user]);
+
+  // Hidden when consent is declined or no products to show
+  if (user && user.consent_tracking === false) {
+    return null;
+  }
 
   if (loading || products.length === 0) return null;
 

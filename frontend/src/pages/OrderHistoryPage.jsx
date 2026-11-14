@@ -26,8 +26,12 @@ export default function OrderHistoryPage() {
   };
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (user) {
+      fetchOrders();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const handleReturnItem = async (orderId, itemId) => {
     try {

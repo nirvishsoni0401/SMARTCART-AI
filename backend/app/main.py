@@ -38,7 +38,7 @@ async def timing_middleware(request: Request, call_next):
     response.headers["X-Process-Time-Ms"] = f"{duration_ms:.2f}"
     return response
 
-# CORS middleware for frontend communication (:5173, :3000, etc.)
+# CORS middleware for frontend communication (:5173, :3000, :4173, etc.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -48,6 +48,7 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://localhost:8000"
     ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

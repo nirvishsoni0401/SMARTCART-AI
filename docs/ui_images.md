@@ -139,7 +139,29 @@ Previously, the header and promotional banners displayed hard-coded `"600+"` tex
 
 ---
 
-## 7. Manual Smoke Test Verification Log
+## 8. Runtime Hardening: React Hook Ordering & Error Boundaries
+
+### 8.1 Hook Ordering Defect & Remediation
+- **Root Cause**: In `ProductDetailPage.jsx`, `galleryImages` was constructed using `useMemo` below conditional early returns (`if (loading)` and `if (!product)`). On initial render (when loading is `true`), 11 hooks mounted before returning. Upon data arrival (second render), execution proceeded past the early returns and invoked `useMemo` as hook #12. React flagged this as a violation of the Rules of Hooks (`Rendered more hooks than during the previous render at ProductDetailPage`), yielding an unhandled crash and blank white screen.
+- **Remediation**:
+  1. Relocated all hooks (`useParams`, `useState`, `useEffect`, `useMemo`, `useCartWishlist`) unconditionally to the top of `ProductDetailPage.jsx`.
+  2. Guarded internal handlers and memoized logic with null checks (`if (!product) return []`).
+  3. Ensured early returns execute strictly after all hooks have registered.
+  4. Audited the full frontend tree: identified and repaired a similar conditional `useEffect` pattern in `RecentlyViewedRow.jsx`.
+
+### 8.2 Top-Level & Per-Route Error Boundaries
+- Implemented `frontend/src/components/ErrorBoundary.jsx` displaying a friendly recovery UI with a "Reload" action and a "Back to shop" navigation link.
+- Wrapped the entire application tree and each individual route inside an `<ErrorBoundary>` in `App.jsx`, guaranteeing that isolated route crashes never trigger complete white screens and that surrounding navigation remains interactive.
+
+### 8.3 Automated Verification Pipeline
+The application now enforces runtime correctness across four automated verification layers:
+1. **Linting (`npm run lint`)**: Enforces `react-hooks/rules-of-hooks` (error) and `react-hooks/exhaustive-deps` (warn) via ESLint.
+2. **Frontend Unit & Integration Tests (`npm test`)**: Vitest + React Testing Library suite (17 tests) asserting:
+   - `ProductDetailPage`: Loading-to-loaded state transitions, not-found states, gallery navigation, and zoom modal Escape lifecycle.
+   - `ProductImage`: Multi-stage fallback sequence (primary $\to$ gallery $\to$ deterministic SVG placeholder) and URL resolution across environments.
+   - Storefront Pages: Recommendation badges, cart, wishlist, order history image rendering, and ErrorBoundary recovery.
+3. **Headless Browser E2E Smoke Tests (`npm run test:e2e`)**: Playwright test suite (8 tests) running against an isolated database copy and Vite dev server. Validates that no unhandled page errors, console errors, failed same-origin requests, or empty image boxes occur across `/`, `/products`, dummyjson products, book products, `/cart`, `/wishlist`, `/orders`, and `/admin`.
+4. **Backend Regression Suite (`pytest`)**: 111 tests validating APIs, schemas, simulation metrics, and data integrity without touching `smartcart.db`.
 
 | Test Case | Scenario Tested | Observed Result | Status |
 | :--- | :--- | :--- | :---: |

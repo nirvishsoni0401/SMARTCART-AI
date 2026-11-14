@@ -3,7 +3,7 @@ import { api } from '../api/client';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 
-const CartWishlistContext = createContext(null);
+export const CartWishlistContext = createContext(null);
 
 export function CartWishlistProvider({ children }) {
   const [cart, setCart] = useState({ items: [], total_items: 0, subtotal: 0.0 });

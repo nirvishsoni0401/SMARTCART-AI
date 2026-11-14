@@ -10,4 +10,16 @@ export default defineConfig({
       '/static': 'http://localhost:8000',
     },
   },
+  preview: {
+    proxy: {
+      '/static': 'http://localhost:8000',
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    include: ['src/**/*.{test,spec}.{js,jsx}'],
+    exclude: ['e2e/**', 'node_modules/**'],
+  },
 })

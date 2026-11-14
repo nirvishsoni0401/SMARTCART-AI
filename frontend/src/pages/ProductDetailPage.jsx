@@ -7,9 +7,7 @@ import {
   ShieldCheck,
   Truck,
   RotateCcw,
-  Sparkles,
   CheckCircle2,
-  AlertCircle,
   MessageSquare,
   UserCheck,
   ZoomIn,
@@ -41,7 +39,7 @@ export default function ProductDetailPage() {
           api.getSimilarProducts(id),
         ]);
         setProduct(prodRes.data);
-        setSelectedImage(prodRes.data.image_url);
+        setSelectedImage(prodRes.data?.image_url || null);
         setSimilar(simRes.data || []);
       } catch (e) {
         console.error('Failed to load product detail:', e);
@@ -63,48 +61,7 @@ export default function ProductDetailPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isZoomed]);
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-16 animate-pulse">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          <div className="aspect-square bg-slate-200 dark:bg-slate-800 rounded-3xl" />
-          <div className="space-y-4">
-            <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
-            <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
-            <div className="h-24 bg-slate-200 dark:bg-slate-800 rounded" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!product) {
-    return (
-      <div className="text-center py-20">
-        <h2 className="text-xl font-bold">Product not found or inactive</h2>
-        <Link to="/products" className="text-indigo-600 font-semibold mt-2 inline-block">
-          ← Back to Catalog
-        </Link>
-      </div>
-    );
-  }
-
-  const isFav = inWishlist(product.id);
-
-  const handleAddToCart = async () => {
-    setAdding(true);
-    await addToCart(product.id, quantity);
-    setTimeout(() => setAdding(false), 800);
-  };
-
-  const handleWishlistToggle = async () => {
-    if (isFav) {
-      await removeFromWishlist(product.id);
-    } else {
-      await addToWishlist(product.id);
-    }
-  };
-
+  // Gallery candidates list - unconditionally defined above early returns
   const galleryImages = useMemo(() => {
     if (!product) return [];
     const list = [];
@@ -120,10 +77,29 @@ export default function ProductDetailPage() {
     if (Array.isArray(product.attributes?.local_gallery)) product.attributes.local_gallery.forEach(add);
     if (Array.isArray(product.attributes?.gallery)) product.attributes.gallery.forEach(add);
     if (product.attributes?.cdn_image_url) add(product.attributes.cdn_image_url);
-    return list.length > 0 ? list : [product.image_url];
+    return list.length > 0 ? list : (product?.image_url ? [product.image_url] : []);
   }, [product]);
 
+  const isFav = product ? inWishlist(product.id) : false;
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    setAdding(true);
+    await addToCart(product.id, quantity);
+    setTimeout(() => setAdding(false), 800);
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!product) return;
+    if (isFav) {
+      await removeFromWishlist(product.id);
+    } else {
+      await addToWishlist(product.id);
+    }
+  };
+
   const handleThumbnailKeyDown = (e, idx) => {
+    if (!galleryImages || galleryImages.length === 0) return;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
       const nextIdx = (idx + 1) % galleryImages.length;
@@ -139,6 +115,33 @@ export default function ProductDetailPage() {
       setSelectedImage(galleryImages[idx]);
     }
   };
+
+  // Early returns strictly placed AFTER all hooks
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 animate-pulse" data-testid="product-loading">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+          <div className="aspect-square bg-slate-200 dark:bg-slate-800 rounded-3xl" />
+          <div className="space-y-4">
+            <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
+            <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
+            <div className="h-24 bg-slate-200 dark:bg-slate-800 rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="text-center py-20" data-testid="product-not-found">
+        <h2 className="text-xl font-bold">Product not found or inactive</h2>
+        <Link to="/products" className="text-indigo-600 font-semibold mt-2 inline-block">
+          ← Back to Catalog
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">

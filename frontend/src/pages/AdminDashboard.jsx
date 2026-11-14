@@ -71,10 +71,14 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 4000);
     return () => clearInterval(interval);
-  }, [windowFilter, originFilter]);
+  }, [isAdmin, windowFilter, originFilter]);
 
   const handleAlgorithmChange = async (newAlgo) => {
     try {

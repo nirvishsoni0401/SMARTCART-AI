@@ -55,3 +55,7 @@ Desktop.ini
 backend/static/products/
 static/products/
 
+# Test artifacts
+frontend/test-results/
+test-results/
+

@@ -398,12 +398,33 @@ npm start
 
 ---
 
-### Running Tests & Experiment Benchmarks
+### Running Tests & Verification Suite
 
-- **Execute Backend Pytest Suite (102 passed, 1 skipped)**:
+- **Execute Backend Pytest Suite (111 passed, 0 skipped, 0 failed)**:
   ```bash
   backend\venv\Scripts\pytest backend/tests -v
   ```
+
+- **Run Frontend Linter (Rules of Hooks & Exhaustive Deps)**:
+  ```bash
+  npm --prefix frontend run lint
+  ```
+
+- **Execute Frontend Unit & Integration Tests (Vitest & RTL, 17 tests)**:
+  ```bash
+  npm --prefix frontend test
+  ```
+
+- **Build Frontend Production Bundle**:
+  ```bash
+  npm --prefix frontend run build
+  ```
+
+- **Execute Headless Browser E2E Smoke Tests (Playwright, 8 tests)**:
+  ```bash
+  npm --prefix frontend run test:e2e
+  ```
+  *(Launches isolated FastAPI backend on temporary database copy and Vite dev server, verifying zero console errors, zero uncaught exceptions, and zero broken image boxes across all storefront routes).*
 
 - **Run Calibrated Simulator v2 Benchmark**:
   ```bash
@@ -427,6 +448,20 @@ npm start
   backend\venv\Scripts\python backend/scripts/cache_product_images.py --workers 12
   ```
   *(Downloads remote thumbnails into `backend/static/products/` for zero-network storefront browsing)*
+
+---
+
+### Troubleshooting & Storefront Runtime FAQ
+
+#### 1. "React has detected a change in the order of Hooks" / White Screen
+- **Cause**: Occurs when hooks (`useMemo`, `useEffect`, `useCallback`) are placed below conditional early returns (`if (loading)` or `if (!product)`).
+- **Remediation**: All hooks are strictly located above any returns. The codebase enforces `'react-hooks/rules-of-hooks': 'error'` and `'react-hooks/exhaustive-deps': 'warn'`. Run `npm --prefix frontend run lint` to catch violations automatically.
+
+#### 2. Route Recovery & Error Boundaries
+- **Behavior**: Every storefront route is wrapped in an `<ErrorBoundary>` component. In the event of an unhandled runtime error, a friendly recovery card is rendered with a "Reload" button and "Back to shop" link while keeping the top navbar and footer interactive.
+
+#### 3. Image URL Resolution in Preview & Production
+- **Behavior**: Local book covers and cached assets served under `/static/` are resolved against `VITE_API_URL` (falling back to `http://localhost:8000`). If third-party CDN images are unreachable or fail, `<ProductImage>` automatically transitions through a multi-tier fallback chain down to the accessible vector placeholder, guaranteeing that no product card renders an empty or broken box.
 
 ---
 

@@ -9,14 +9,17 @@ import {
   Package,
 } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const rawBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8000';
+export const API_BASE_URL = rawBase.replace(/\/+$/, '');
 
 /**
  * Resolves relative static paths (/static/...) to backend server URL.
+ * Preserves external CDN URLs, data URIs, and blob URIs.
  */
 export function resolveImageUrl(url) {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
+  if (!trimmed) return '';
   if (
     trimmed.startsWith('http://') ||
     trimmed.startsWith('https://') ||
@@ -24,6 +27,10 @@ export function resolveImageUrl(url) {
     trimmed.startsWith('blob:')
   ) {
     return trimmed;
+  }
+  if (trimmed.startsWith('/static') || trimmed.startsWith('static/')) {
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return `${API_BASE_URL}${cleanPath}`;
   }
   if (trimmed.startsWith('/')) {
     return `${API_BASE_URL}${trimmed}`;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sparkles, Lock, Mail, User, ShieldCheck } from 'lucide-react';
+import { X, Sparkles, Lock, Mail, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AuthModal({ isOpen, onClose }) {
@@ -16,7 +16,7 @@ export default function AuthModal({ isOpen, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    let ok = false;
+    let ok;
     if (isRegister) {
       ok = await register(name, email, password, consent);
     } else {
