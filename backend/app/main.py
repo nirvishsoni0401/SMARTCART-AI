@@ -1,11 +1,16 @@
 import time
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import init_db
 from app.services.latency_tracker import latency_tracker
 from app.routers import auth, products, cart, wishlist, orders, recommendations, events, admin
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,6 +24,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Mount local static files directory for local product covers and cached assets
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Timing middleware for end-to-end endpoint latency tracking
 @app.middleware("http")

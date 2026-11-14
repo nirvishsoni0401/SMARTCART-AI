@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
 import { useCartWishlist } from '../context/CartWishlistContext';
+import ProductImage from '../components/ProductImage';
 
 export default function WishlistPage() {
   const { wishlist, removeFromWishlist, addToCart } = useCartWishlist();
@@ -46,14 +47,20 @@ export default function WishlistPage() {
           >
             <div>
               <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-3">
-                <img
-                  src={item.product.image_url}
-                  alt={item.product.name}
-                  className="w-full h-full object-cover"
-                />
+                <Link
+                  to={`/products/${item.product.id}`}
+                  className="block w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-xl"
+                  aria-label={`View ${item.product.name}`}
+                >
+                  <ProductImage
+                    product={item.product}
+                    aspectRatio="aspect-square"
+                    hoverZoom={true}
+                  />
+                </Link>
                 <button
                   onClick={() => removeFromWishlist(item.product.id)}
-                  className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-white/80 dark:bg-slate-900/80 text-rose-500 hover:bg-white shadow-sm"
+                  className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-white/80 dark:bg-slate-900/80 text-rose-500 hover:bg-white shadow-sm z-10"
                   title="Remove from wishlist"
                 >
                   <Trash2 className="w-4 h-4" />

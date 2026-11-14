@@ -4,6 +4,7 @@ import { Package, RotateCcw, CheckCircle, Clock, AlertCircle } from 'lucide-reac
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import ProductImage from '../components/ProductImage';
 
 export default function OrderHistoryPage() {
   const [orders, setOrders] = useState([]);
@@ -123,11 +124,13 @@ export default function OrderHistoryPage() {
               {order.items.map((item) => (
                 <div key={item.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <img
-                      src={item.product.image_url}
-                      alt={item.product.name}
-                      className="w-16 h-16 rounded-xl object-cover bg-slate-100 shrink-0"
-                    />
+                    <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0">
+                      <ProductImage
+                        product={item.product}
+                        aspectRatio="aspect-square"
+                        hoverZoom={false}
+                      />
+                    </div>
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
                         {item.product.brand} • {item.product.category}

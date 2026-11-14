@@ -27,6 +27,7 @@ export const api = {
 
   // Products
   getProducts: (params) => apiClient.get('/products', { params }),
+  getProductCount: () => apiClient.get('/products/count'),
   getProduct: (id) => apiClient.get(`/products/${id}`),
   getSimilarProducts: (id) => apiClient.get(`/products/${id}/similar`),
   getCategories: () => apiClient.get('/products/categories'),

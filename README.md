@@ -416,6 +416,18 @@ npm start
   ```
   *(Updates `docs/phase12a2-report.md`, `docs/sim_assumptions.md`, plots in `experiments/plots/sim_v2/`, and README Section 9.1)*
 
+- **Diagnose Storefront Image Health**:
+  ```bash
+  backend\venv\Scripts\python backend/scripts/check_product_images.py
+  ```
+  *(Audits reachability across all 262 active products; saves report to `experiments/results/image_check.json`)*
+
+- **Optional Offline CDN Image Caching**:
+  ```bash
+  backend\venv\Scripts\python backend/scripts/cache_product_images.py --workers 12
+  ```
+  *(Downloads remote thumbnails into `backend/static/products/` for zero-network storefront browsing)*
+
 ---
 
 ### Demo Credentials

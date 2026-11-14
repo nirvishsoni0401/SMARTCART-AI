@@ -5,6 +5,7 @@ import { useCartWishlist } from '../context/CartWishlistContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { api } from '../api/client';
+import ProductImage from '../components/ProductImage';
 
 export default function CartPage() {
   const { cart, updateCartQty, removeFromCart, clearCart } = useCartWishlist();
@@ -66,7 +67,7 @@ export default function CartPage() {
         </div>
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Your Cart is Empty</h2>
         <p className="text-xs text-slate-500 max-w-sm mx-auto">
-          Explore our collection of 600+ top-rated products across 6 departments with personalized AI recommendations.
+          Explore our collection of top-rated products across 6 departments with personalized AI recommendations.
         </p>
         <Link
           to="/products"
@@ -93,11 +94,13 @@ export default function CartPage() {
               key={item.id}
               className="flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm"
             >
-              <img
-                src={item.product.image_url}
-                alt={item.product.name}
-                className="w-20 h-20 rounded-xl object-cover bg-slate-100 shrink-0"
-              />
+              <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0">
+                <ProductImage
+                  product={item.product}
+                  aspectRatio="aspect-square"
+                  hoverZoom={false}
+                />
+              </div>
 
               <div className="flex-1 min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">

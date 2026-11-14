@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="600" height="800">
+  <defs>
+    <linearGradient id="cover_grad_12" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c1917" />
+      <stop offset="100%" stop-color="#292524" />
+    </linearGradient>
+    <linearGradient id="spine_grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.3" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.4" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.4" flood-color="#000000" />
+    </filter>
+  </defs>
+
+  <!-- Background Base Gradient -->
+  <rect width="600" height="800" fill="url(#cover_grad_12)" />
+
+  <!-- Book Spine Accents (Left Margin) -->
+  <rect x="0" y="0" width="40" height="800" fill="url(#spine_grad)" />
+  <line x1="40" y1="0" x2="40" y2="800" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.5" />
+
+  <!-- Top Pill Tag: 'BOOK' -->
+  <g transform="translate(64, 56)">
+    <rect width="84" height="28" rx="6" fill="#ffffff" fill-opacity="0.15" stroke="#ffffff" stroke-opacity="0.25" stroke-width="1"/>
+    <text x="42" y="19" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="2">BOOK</text>
+  </g>
+
+  <!-- Subcategory Label -->
+  <text x="64" y="180" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="700" fill="#e7e5e4" letter-spacing="1.5" text-transform="uppercase">HISTORY</text>
+
+  <!-- Book Title (Serif, High Contrast) -->
+  <g filter="url(#shadow)">
+    <text x="64" y="250" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700" fill="#ffffff">Sapiens: A Brief</text>
+    <text x="64" y="294" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700" fill="#ffffff">History of</text>
+    <text x="64" y="338" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700" fill="#ffffff">Humankind - Max</text>
+  </g>
+
+  <!-- Divider Rule -->
+  <line x1="64" y1="650" x2="164" y2="650" stroke="#e7e5e4" stroke-width="2.5" stroke-linecap="round" />
+
+  <!-- Publisher / Author Brand at Bottom -->
+  <text x="64" y="705" font-family="system-ui, -apple-system, sans-serif" font-size="19" font-weight="600" fill="#f8fafc" letter-spacing="0.5">Rupa Publications</text>
+  <text x="64" y="732" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" fill="#94a3b8">SmartCart Library Edition</text>
+</svg>

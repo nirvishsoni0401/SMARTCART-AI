@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ShoppingBag,
@@ -14,13 +14,25 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCartWishlist } from '../context/CartWishlistContext';
+import { api } from '../api/client';
 
 export default function Navbar({ onOpenAuthModal }) {
   const { user, logout, isAdmin } = useAuth();
   const { cart, wishlist } = useCartWishlist();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [productCount, setProductCount] = useState(262);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.getProductCount()
+      .then((res) => {
+        if (res.data?.total) {
+          setProductCount(res.data.total);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -66,7 +78,7 @@ export default function Navbar({ onOpenAuthModal }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search 600+ products, brands (e.g. boAt, Peter England)..."
+            placeholder={`Search ${productCount}+ products, brands (e.g. boAt, Peter England)...`}
             className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition"
           />
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -161,7 +173,7 @@ export default function Navbar({ onOpenAuthModal }) {
       {/* Category Navigation Bar (Desktop) */}
       <nav className="hidden md:flex border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 px-4 sm:px-8 py-2 justify-center gap-8 text-xs font-semibold text-slate-600 dark:text-slate-400">
         <Link to="/products" className="hover:text-indigo-600 dark:hover:text-white transition">
-          All Products (600+)
+          All Products ({productCount})
         </Link>
         {categories.map((cat) => (
           <Link

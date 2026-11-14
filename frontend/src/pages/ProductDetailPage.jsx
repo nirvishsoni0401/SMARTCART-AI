@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Star,
@@ -11,10 +11,13 @@ import {
   CheckCircle2,
   AlertCircle,
   MessageSquare,
-  UserCheck
+  UserCheck,
+  ZoomIn,
+  X
 } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import RecentlyViewedRow from '../components/RecentlyViewedRow';
+import ProductImage from '../components/ProductImage';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { api } from '../api/client';
 
@@ -23,7 +26,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState(null);
   const [similar, setSimilar] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [imgError, setImgError] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -48,6 +51,17 @@ export default function ProductDetailPage() {
     }
     loadData();
   }, [id]);
+
+  // Close zoom modal on Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isZoomed) {
+        setIsZoomed(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isZoomed]);
 
   if (loading) {
     return (
@@ -91,14 +105,79 @@ export default function ProductDetailPage() {
     }
   };
 
-  const galleryImages = product.attributes?.gallery && Array.isArray(product.attributes.gallery)
-    ? product.attributes.gallery
-    : [product.image_url];
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+    const list = [];
+    const seen = new Set();
+    const add = (u) => {
+      if (u && typeof u === 'string' && u.trim() && !seen.has(u.trim())) {
+        seen.add(u.trim());
+        list.push(u.trim());
+      }
+    };
+    if (product.attributes?.local_image_url) add(product.attributes.local_image_url);
+    if (product.image_url) add(product.image_url);
+    if (Array.isArray(product.attributes?.local_gallery)) product.attributes.local_gallery.forEach(add);
+    if (Array.isArray(product.attributes?.gallery)) product.attributes.gallery.forEach(add);
+    if (product.attributes?.cdn_image_url) add(product.attributes.cdn_image_url);
+    return list.length > 0 ? list : [product.image_url];
+  }, [product]);
 
-  const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600" fill="%23f8fafc"><rect width="600" height="600" fill="%23f1f5f9"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%2394a3b8">${encodeURIComponent(product.category)}</text></svg>`;
+  const handleThumbnailKeyDown = (e, idx) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIdx = (idx + 1) % galleryImages.length;
+      setSelectedImage(galleryImages[nextIdx]);
+      document.getElementById(`gallery-thumb-${nextIdx}`)?.focus();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIdx = (idx - 1 + galleryImages.length) % galleryImages.length;
+      setSelectedImage(galleryImages[prevIdx]);
+      document.getElementById(`gallery-thumb-${prevIdx}`)?.focus();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setSelectedImage(galleryImages[idx]);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+      {/* Click-to-Zoom Lightbox Modal */}
+      {isZoomed && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Enlarged product image preview"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          onClick={() => setIsZoomed(false)}
+        >
+          <div
+            className="relative max-w-3xl w-full flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsZoomed(false)}
+              className="absolute -top-12 right-0 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition focus:outline-none focus:ring-2 focus:ring-white"
+              aria-label="Close zoomed image"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <div className="w-full aspect-square bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-700/50 flex items-center justify-center overflow-hidden">
+              <ProductImage
+                product={product}
+                src={selectedImage}
+                aspectRatio="aspect-square"
+                hoverZoom={false}
+                eager={true}
+              />
+            </div>
+            <p className="text-xs text-slate-300 mt-3 text-center">
+              Press Escape or click anywhere outside to close
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb Navigation */}
       <nav className="flex items-center gap-2 text-xs text-slate-500">
         <Link to="/" className="hover:text-indigo-600">Home</Link>
@@ -116,20 +195,33 @@ export default function ProductDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14">
         {/* Left: Gallery & Main Image */}
         <div className="space-y-4">
-          <div className="aspect-square rounded-3xl bg-white dark:bg-slate-900 p-8 flex items-center justify-center border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-            <img
-              src={imgError ? fallbackSvg : (selectedImage || product.image_url)}
-              alt={product.name}
-              onError={() => setImgError(true)}
-              className="max-h-full max-w-full object-contain transition duration-500 group-hover:scale-105"
-            />
+          <div className="aspect-square rounded-3xl bg-white dark:bg-slate-900 p-4 sm:p-8 flex items-center justify-center border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+            <button
+              type="button"
+              onClick={() => setIsZoomed(true)}
+              className="w-full h-full block focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500 rounded-2xl cursor-zoom-in relative"
+              aria-label="Click to enlarge product photo"
+            >
+              <ProductImage
+                product={product}
+                src={selectedImage}
+                aspectRatio="aspect-square"
+                eager={true}
+                hoverZoom={true}
+              />
+              <span className="absolute bottom-3 right-3 bg-black/60 text-white text-[11px] font-semibold px-2.5 py-1 rounded-lg backdrop-blur-sm opacity-0 group-hover:opacity-100 transition flex items-center gap-1.5 shadow-sm">
+                <ZoomIn className="w-3.5 h-3.5" />
+                <span>Zoom</span>
+              </span>
+            </button>
+
             {product.discount_pct > 0 && (
-              <span className="absolute top-4 left-4 bg-rose-500 text-white text-xs font-black px-2.5 py-1 rounded-full shadow">
+              <span className="absolute top-4 left-4 bg-rose-500 text-white text-xs font-black px-2.5 py-1 rounded-full shadow z-10">
                 {Math.round(product.discount_pct)}% OFF
               </span>
             )}
             {product.attributes?.is_unbranded && (
-              <span className="absolute top-4 right-4 bg-slate-100 dark:bg-slate-800 text-slate-500 text-[11px] font-semibold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
+              <span className="absolute top-4 right-4 bg-slate-100 dark:bg-slate-800 text-slate-500 text-[11px] font-semibold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 z-10">
                 Direct Catalog Item
               </span>
             )}
@@ -137,18 +229,33 @@ export default function ProductDetailPage() {
 
           {/* Multiple Image Thumbnails */}
           {galleryImages.length > 1 && (
-            <div className="flex items-center gap-3 overflow-x-auto pb-2">
+            <div
+              role="tablist"
+              aria-label="Product image thumbnails"
+              className="flex items-center gap-3 overflow-x-auto pb-2"
+            >
               {galleryImages.map((imgUrl, idx) => (
                 <button
                   key={idx}
-                  onClick={() => { setSelectedImage(imgUrl); setImgError(false); }}
-                  className={`w-16 h-16 rounded-xl bg-white dark:bg-slate-900 p-1 border-2 transition flex-shrink-0 ${
+                  id={`gallery-thumb-${idx}`}
+                  role="tab"
+                  aria-selected={selectedImage === imgUrl}
+                  aria-label={`Select product image ${idx + 1} of ${galleryImages.length}`}
+                  onClick={() => setSelectedImage(imgUrl)}
+                  onKeyDown={(e) => handleThumbnailKeyDown(e, idx)}
+                  tabIndex={0}
+                  className={`w-16 h-16 rounded-xl bg-white dark:bg-slate-900 p-1 border-2 transition flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                     selectedImage === imgUrl
-                      ? 'border-indigo-600 shadow-md'
+                      ? 'border-indigo-600 shadow-md ring-2 ring-indigo-200 dark:ring-indigo-900/60'
                       : 'border-slate-200 dark:border-slate-800 hover:border-slate-400'
                   }`}
                 >
-                  <img src={imgUrl} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-contain" />
+                  <ProductImage
+                    product={product}
+                    src={imgUrl}
+                    aspectRatio="aspect-square"
+                    hoverZoom={false}
+                  />
                 </button>
               ))}
             </div>

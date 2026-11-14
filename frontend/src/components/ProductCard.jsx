@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star, Heart, ShoppingBag, ThumbsDown, Sparkles } from 'lucide-react';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { api } from '../api/client';
+import ProductImage from './ProductImage';
 
 export default function ProductCard({
   product,
@@ -11,9 +12,9 @@ export default function ProductCard({
   was_exploration = false,
   log_id = null,
   onDislike = null,
+  eager = false,
 }) {
   const { addToCart, addToWishlist, removeFromWishlist, inWishlist } = useCartWishlist();
-  const [imgError, setImgError] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [adding, setAdding] = useState(false);
 
@@ -61,34 +62,35 @@ export default function ProductCard({
     api.recordEvent(product.id, 'click', log_id, sessionId).catch(() => {});
   };
 
-  // Fallback placeholder SVG
-  const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" fill="%23f1f5f9"><rect width="400" height="400" fill="%23f8fafc"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="20" fill="%2394a3b8">${encodeURIComponent(product.category || 'Product')}</text></svg>`;
-
   return (
     <div className="group relative flex flex-col justify-between bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm hover:shadow-xl hover:border-indigo-400 dark:hover:border-indigo-500 transition-all duration-300">
       <div>
         {/* Top Badges & Actions */}
         <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800 mb-3">
-          <Link to={`/products/${product.id}`} onClick={handleCardClick} className="block w-full h-full">
-            <img
-              src={imgError ? fallbackSvg : product.image_url}
-              alt={product.name}
-              onError={() => setImgError(true)}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
+          <Link
+            to={`/products/${product.id}`}
+            onClick={handleCardClick}
+            className="block w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-xl"
+            aria-label={`View ${product.name}`}
+          >
+            <ProductImage
+              product={product}
+              aspectRatio="aspect-square"
+              eager={eager}
+              hoverZoom={true}
             />
           </Link>
 
           {/* Discount Tag */}
           {product.discount_pct > 0 && (
-            <span className="absolute top-2.5 left-2.5 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+            <span className="absolute top-2.5 left-2.5 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
               {Math.round(product.discount_pct)}% OFF
             </span>
           )}
 
           {/* Exploration Badge if active */}
           {was_exploration && (
-            <span className="absolute top-2.5 right-11 bg-amber-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow-sm">
+            <span className="absolute top-2.5 right-11 bg-amber-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow-sm z-10">
               EXPLORE
             </span>
           )}
@@ -96,7 +98,7 @@ export default function ProductCard({
           {/* Wishlist Button */}
           <button
             onClick={handleWishlistToggle}
-            className={`absolute top-2.5 right-2.5 p-1.5 rounded-full backdrop-blur-md shadow-sm transition ${
+            className={`absolute top-2.5 right-2.5 p-1.5 rounded-full backdrop-blur-md shadow-sm transition z-10 ${
               isFav
                 ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/80 dark:text-rose-400'
                 : 'bg-white/80 dark:bg-slate-900/80 text-slate-400 hover:text-rose-500 hover:bg-white'
@@ -110,7 +112,7 @@ export default function ProductCard({
           {explanation && (
             <button
               onClick={handleDislike}
-              className="absolute bottom-2.5 right-2.5 p-1.5 rounded-full bg-white/85 dark:bg-slate-900/85 text-slate-400 hover:text-rose-600 hover:bg-white shadow-sm transition"
+              className="absolute bottom-2.5 right-2.5 p-1.5 rounded-full bg-white/85 dark:bg-slate-900/85 text-slate-400 hover:text-rose-600 hover:bg-white shadow-sm transition z-10"
               title="Not interested / Dislike (tunes your recommendation bandit)"
             >
               <ThumbsDown className="w-3.5 h-3.5" />

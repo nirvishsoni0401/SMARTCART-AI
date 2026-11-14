@@ -50,3 +50,8 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 *.log
+
+# Cached product images (downloaded from CDN)
+backend/static/products/
+static/products/
+

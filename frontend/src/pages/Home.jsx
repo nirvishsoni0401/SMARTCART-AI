@@ -21,17 +21,22 @@ import { api } from '../api/client';
 export default function Home() {
   const [deals, setDeals] = useState([]);
   const [topRated, setTopRated] = useState([]);
+  const [productCount, setProductCount] = useState(262);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadFeatured() {
       try {
-        const [dealsRes, topRes] = await Promise.all([
+        const [dealsRes, topRes, countRes] = await Promise.all([
           api.getProducts({ min_discount: 30, page_size: 4, sort_by: 'popularity' }),
           api.getProducts({ min_rating: 4.5, page_size: 4, sort_by: 'rating_desc' }),
+          api.getProductCount().catch(() => ({ data: { total: 262 } }))
         ]);
         setDeals(dealsRes.data.products || []);
         setTopRated(topRes.data.products || []);
+        if (countRes.data?.total) {
+          setProductCount(countRes.data.total);
+        }
       } catch (e) {
         console.error('Error fetching homepage products:', e);
       } finally {
@@ -66,7 +71,7 @@ export default function Home() {
         <div className="max-w-2xl space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-indigo-200 text-xs font-bold tracking-wide backdrop-blur-md border border-white/10">
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            600+ Products • Adaptive LinUCB Bandits
+            {productCount}+ Products • Adaptive LinUCB Bandits
           </div>
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
             Next-Gen E-Commerce Powered by <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-pink-300">Reinforcement Learning</span>
@@ -79,7 +84,7 @@ export default function Home() {
               to="/products"
               className="px-6 py-3 rounded-xl bg-white text-indigo-950 font-bold text-sm shadow-lg hover:bg-slate-100 transition flex items-center gap-2"
             >
-              <span>Explore 600+ Products</span>
+              <span>Explore {productCount}+ Products</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link

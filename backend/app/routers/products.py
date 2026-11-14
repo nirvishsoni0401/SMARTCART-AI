@@ -83,6 +83,12 @@ def list_products(
         products=[ProductOut.model_validate(p) for p in products]
     )
 
+@router.get("/count")
+def get_products_count(db: Session = Depends(get_db)):
+    """Returns the exact count of active catalog products."""
+    count = db.query(Product).filter(Product.is_active == True).count()
+    return {"total": count, "active": count}
+
 @router.get("/categories")
 def get_categories(db: Session = Depends(get_db)):
     results = db.query(

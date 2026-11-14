@@ -12,6 +12,7 @@ if str(BACKEND_DIR) not in sys.path:
 from app.database import SessionLocal, init_db
 from app.models import Product, User, CartItem, WishlistItem, Order, OrderItem, InteractionEvent, RecommendationLog, ModelState
 from app.auth import hash_password
+from app.services.cover_generator import save_book_cover
 
 CATEGORIES = [
     "Electronics",
@@ -118,15 +119,30 @@ TEMPLATES = {
     ]
 }
 
-def seed_database():
+def seed_database(force: bool = False):
     print("[Seed] Initializing database tables...")
     init_db()
     db = SessionLocal()
 
-    # Clear existing products to ensure clean seed
+    # Check existing products count
     existing_product_count = db.query(Product).count()
-    if existing_product_count >= 600:
-        print(f"[Seed] Products already seeded ({existing_product_count} products found). Skipping product seed.")
+    if existing_product_count >= 600 and not force:
+        print(f"[Seed] Products already seeded ({existing_product_count} products found). Ensuring book covers...")
+        # Ensure existing books have deterministic local covers generated
+        books = db.query(Product).filter(Product.category == "Books").all()
+        updated_books = 0
+        for b in books:
+            if not b.image_url or "picsum.photos" in b.image_url or not b.image_url.startswith("/static/covers/"):
+                subcat = b.attributes.get("Subcategory", "Book") if b.attributes else "Book"
+                b.image_url = save_book_cover(title=b.name, brand=b.brand, subcategory=subcat, product_id=b.id)
+                if b.attributes is not None:
+                    attrs = dict(b.attributes)
+                    attrs["gallery"] = [b.image_url]
+                    b.attributes = attrs
+                updated_books += 1
+        if updated_books > 0:
+            db.commit()
+            print(f"[Seed] Updated {updated_books} book covers to deterministic local covers.")
     else:
         print(f"[Seed] Clearing old product data (found {existing_product_count})...")
         db.query(CartItem).delete()
@@ -168,9 +184,12 @@ def seed_database():
                 popularity = round(random.uniform(40.0, 98.0), 1)
                 stock = random.randint(15, 350)
                 
-                # Seeded image URL using picsum photos with deterministic seed
-                img_seed = 1000 + product_id
-                image_url = f"https://picsum.photos/seed/smartcart_{img_seed}/600/600"
+                # Local deterministic cover for Books; fallback image URL for non-book seeds
+                if cat == "Books":
+                    image_url = save_book_cover(title=name, brand=brand, subcategory=subcat, product_id=product_id)
+                else:
+                    img_seed = 1000 + product_id
+                    image_url = f"https://picsum.photos/seed/smartcart_{img_seed}/600/600"
 
                 attributes = {
                     "Subcategory": subcat,
@@ -178,7 +197,8 @@ def seed_database():
                     "Country of Origin": "India",
                     "Return Policy": "7 Days Replacement / Return",
                     "Color": random.choice(["Black", "Navy Blue", "Charcoal Gray", "Classic White", "Silver", "Olive Green", "Teal"]),
-                    "Seller": "SmartCart Verified Retailer"
+                    "Seller": "SmartCart Verified Retailer",
+                    "gallery": [image_url]
                 }
 
                 desc = f"Experience top tier quality with the {name}. Designed with premium materials for maximum durability and satisfaction. Genuine {brand} product with authentic warranty and express delivery across India."
@@ -234,5 +254,6 @@ def seed_database():
     print("[Seed] Seeding completed successfully.")
 
 if __name__ == "__main__":
-    seed_database()
+    force_flag = "--force" in sys.argv
+    seed_database(force=force_flag)
 
