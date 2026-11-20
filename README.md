@@ -742,3 +742,6 @@ On pure novel target items, regenerated Warm LinUCB achieves **5.46%** Macro HR@
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
+=======
+# SMARTCART-AI
+>>>>>>> df133b9a616d5093784b67d37e274e6f4b9bc497
